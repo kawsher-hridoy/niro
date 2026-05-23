@@ -1,28 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --accent: #0b6e4f;
+  --color-background: #fafaf7;
+  --color-foreground: #1a1f1c;
+  --color-primary: #0f7b4a;
+  --color-primary-hover: #0a5e38;
+  --color-muted: #6b7570;
+  --color-card: #ffffff;
+  --color-card-border: #e7e5df;
+  --color-accent-soft: #e8f4ed;
+  --color-accent: #0f7b4a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-accent: var(--accent);
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-muted: var(--color-muted);
+  --color-card: var(--color-card);
+  --color-card-border: var(--color-card-border);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-accent: var(--color-accent);
   --font-sans: var(--font-bangla);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-background);
+  color: var(--color-foreground);
   font-family: var(--font-bangla), system-ui, sans-serif;
   font-feature-settings: "akhn", "blwf", "half", "pstf", "vatu", "rphf";
   font-variant-ligatures: common-ligatures contextual;
@@ -33,9 +38,6 @@ body {
   font-feature-settings: "akhn", "blwf", "half", "pstf", "vatu", "rphf";
 }
 
-/* Print stylesheet — `analyses/[id]` becomes a clean PDF via browser print.
- * Phase D PDF "export" is achieved with Ctrl/Cmd+P; we hide everything that
- * isn't the analysis body. */
 @media print {
   body {
     background: white !important;
@@ -49,5 +51,5 @@ body {
   }
   table { page-break-inside: avoid; }
   section { page-break-inside: avoid; }
-  .text-accent { color: #0b6e4f !important; }
+  .text-accent { color: var(--color-accent) !important; }
 }
