@@ -253,6 +253,16 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Verified by:** All 4 acceptance greps return zero matches (DisclaimerBanner, ICADHI/Track 1/v0.1.0/Get started/About, English card subtitles). `npx tsc --noEmit` exits 0. User confirmed in browser.
 - **Commit:** `caaa8f9`.
 
+### Fix #2 — SaaS-grade auth (signup + password login + reset)
+
+- **Problem:** `/signin` had no separation between sign-up and sign-in. Phone OTP was the only credential. No email field, no password, no way for returning users to log in directly, no forgot-password flow.
+- **Root cause:** Phase B shipped the simplest possible auth (OTP-only, first-verify-creates-user) to unblock the upload path. Never revisited.
+- **Change:** Migration `0004_email_password_auth` adds email + password_hash + verification timestamps + lockout columns to `users`, adds `purpose` to `otp_codes` (login|reset), and creates `pending_signups`. New endpoints under `/auth`: `signup/start`, `signup/verify`, `signup/resend-otp`, `login/password`, `password/reset/start`, `password/reset/confirm` — with regex email validation, E.164 phone, argon2-cffi password hashing (D-012), 5-fail / 15-min lockout, full audit-event coverage. Legacy `/login/otp/{request,verify}` preserved so the 6 seeded doctors (no password) keep working. Frontend: `/signin` is now a tabbed UI (sign in / sign up) with show/hide password, strength meter, inline + top error banners; `/verify` branches by `signup_token` / `reset_token` / plain phone; new `/forgot-password` and `/signin/otp` surfaces.
+- **Files:** `niro/backend/api/routers/auth.py` (rewrite), `niro/backend/db/models.py` (User fields + OtpCode.purpose + new PendingSignup), `niro/backend/db/migrations/versions/0004_email_password_auth.py` (new), `niro/backend/services/auth.py` (argon2 helpers), `niro/backend/seeds/doctors.py` (phone_verified_at), `niro/backend/pyproject.toml` (+argon2-cffi), `niro/frontend/src/lib/api.ts` (authApi + parseAuthError), `niro/frontend/src/app/signin/page.tsx` (rewrite), `niro/frontend/src/app/verify/page.tsx` (3-mode rewrite), `niro/frontend/src/app/forgot-password/page.tsx` (new), `niro/frontend/src/app/signin/otp/page.tsx` (new), `docs/decisions.md` (D-012).
+- **Verified by:** curl smoke covered all backend acceptance (signup → verify → password login by email + phone → 5 wrong → 423 lock → reset clears → post-reset login → doctor OTP still works); `npx tsc --noEmit` exits 0; audit log shows all 7 new event types; grep confirms no plaintext password is logged or returned; user verified in browser.
+- **New decision:** D-012 — argon2-cffi for password hashing (OWASP-recommended; passlib+bcrypt 5.x compat trap from D-009 stays avoided).
+- **Commit:** `08dcc5b`.
+
 ---
 
 ## Template for new entries
