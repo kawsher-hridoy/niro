@@ -56,6 +56,9 @@ real_lab*.png
 *.db
 *.sqlite
 *.sqlite3
+
+# niro.sh runtime state (PIDs + service logs)
+.niro-run/
 .data/
 
 # Claude Code local state — keep skill and config, ignore everything else
