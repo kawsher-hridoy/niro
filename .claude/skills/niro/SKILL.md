@@ -1,13 +1,14 @@
 ---
 name: niro
-description: Use when working on the Niro health-app codebase — implementing features, debugging the AI provider integration, reasoning about ICADHI submission constraints, or extending any of the 11 tables / 29 endpoints / 14 frontend pages. Reflects state as of end of Phase D (Phase 1 feature-complete).
+description: Use when working on the Niro health-app codebase — implementing features, debugging the AI provider integration, reasoning about ICADHI submission constraints, or extending any of the 11 tables / 29 endpoints / 14 frontend pages. Reflects state as of end of Phase D + Fix #1 (Phase 1 feature-complete; iterative issue-fix loop active).
 ---
 
 # Niro project skill
 
 Use this when work touches Niro (the IEEE ICADHI 2026 health app in this
-repo). Reflects state **as of end of Phase D — feature-complete for the
-Phase-1 video submission**.
+repo). Reflects state **as of end of Phase D + Fix #1 — Phase 1 is
+feature-complete; the user is driving an iterative issue-fix loop until
+the 27 May Phase-1 video submission**.
 
 ## What Niro is in one sentence
 
@@ -27,12 +28,16 @@ Live engineering docs: `docs/` folder.
 | B — AI integration + upload path | ✅ Merged (PR #2) |
 | C — Profile + verification + doctor portal | ✅ Merged (PR #3) |
 | D — Chamber QR + browser PDF + polish | ✅ Merged (PR #4) |
+| **Day 5 — iterative issue fixes** | 🔧 **Active** — branch-per-issue loop; Fix #1 (landing redesign) merged |
 | **E — Video submission** | ⏳ **User action** — record + upload by 27 May |
 | F — Live-demo polish + VPS deploy | Conditional on 30 May shortlist |
 | G — Demo day | 15 June |
 
-`main` is at `d2a6a9a` (post Phase D merge). Read
-`docs/build-log.md` Day 4 entry first when picking up.
+`main` is at `9083b0c` (post Fix #1 + CLAUDE.md reflow, pushed to origin).
+Read `docs/build-log.md` Day 4 first, then Day 5 for the active fix loop.
+
+**Active workflow plan:** `/home/l0minex/.claude/plans/twinkly-inventing-pebble.md` v2.0
+(branch-per-issue → squash-merge after user approval → Day-5 log entry).
 
 ## Key constraints
 
@@ -61,6 +66,7 @@ Live engineering docs: `docs/` folder.
 | D-008 | Sync SQLAlchemy 2.0 (not async) | Locked for ICADHI |
 | D-009 | OTP storage: `sha256(salt:code)` (not bcrypt) | Locked |
 | D-010 | PDF export via browser `window.print()` (not WeasyPrint) | Locked for Phase 1 |
+| D-011 | Landing `/` is a full marketing site, light-mode only; `DisclaimerBanner` removed | Locked for Phase 1 |
 
 Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also need an ADR.
 
@@ -125,7 +131,7 @@ Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also nee
 
 | Path | Notes |
 |---|---|
-| `app/page.tsx` | Public landing |
+| `app/page.tsx` | Public landing — **post-Fix-#1 it's a 6-section marketing site** (sticky nav, hero + CSS phone mockup, trust strip, feature cards, how-it-works, final CTA, footer). All subcomponents inline in this file (`SiteNav`, `Hero`, `PhoneMockup`, `TrustStrip`, `Stat`, `Features`, `FeatureCard`, `HowItWorks`, `Step`, `FinalCTA`, `SiteFooter`). Server component, no client interactivity. |
 | `app/signin/`, `app/verify/` | OTP flow |
 | `app/home/` | Patient dashboard + nav chips |
 | `app/upload/` | File picker + auto-analyze (supports `?document=` re-analyze) |
@@ -200,6 +206,10 @@ export default function Page({ params }: PageProps) {
 - Adding a `tailwind.config.ts` — Tailwind 4 uses `@theme inline`.
 - Reaching for bcrypt for short-lived secrets (D-009).
 - Importing `images.domains` config (deprecated in Next 16).
+- **Recreating `DisclaimerBanner`** — deleted in Fix #1 (D-011). The disclaimer copy belongs inline on AI-output pages, not in a global banner.
+- **Reintroducing dark mode** for Phase 1 — light-mode only (D-011). Don't add `prefers-color-scheme: dark` overrides.
+- **Hard-coding hex colors** in new pages — use the tokens in `globals.css` (`--color-primary`, `--color-muted`, `--color-card`, `--color-card-border`, `--color-accent-soft`, etc.). `--color-accent` is an alias of `--color-primary`, kept for backward compatibility with existing `text-accent`/`bg-accent` utility classes.
+- **Committing fixes directly to `main`** during the issue-fix loop — branch per issue, squash-merge after user approval (see CLAUDE.md "Issue-fix workflow").
 
 ## Common operations
 

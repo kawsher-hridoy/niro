@@ -13,8 +13,9 @@ on-demand doctor verification platform for Bangladesh. Submitted to
 **IEEE ICADHI 2026 Project Showcase, Track 1**.
 
 Phase 1 build is **feature-complete** as of 23 May 2026. The current
-work is bug fixes (until 27 May submission) and live-demo polish
-(post-30 May if shortlisted).
+work is **iterative issue fixes** (Day 5 in `docs/build-log.md`, driven
+by the user — branch per issue, squash-merge after approval) until
+27 May submission. Live-demo polish (post-30 May if shortlisted) follows.
 
 ---
 
@@ -47,7 +48,7 @@ work is bug fixes (until 27 May submission) and live-demo polish
 ## Stack constraints — pre-2026 training data may be wrong about these
 
 - **Next.js 16.2.6** — `params` and `searchParams` are **Promises**. Use `await props.params` in server components or `use(params)` in client components. `next lint` removed; `middleware.ts → proxy.ts`. Turbopack is the default dev runtime. Read `niro/frontend/AGENTS.md` for the local Next.js note. Full list of breaking changes in `CLAUDE.md` "Next.js 16 gotchas".
-- **Tailwind 4** — no `tailwind.config.ts`. Theme tokens in `globals.css` under `@theme inline { ... }`. Import via `@import "tailwindcss";`.
+- **Tailwind 4** — no `tailwind.config.ts`. Theme tokens in `globals.css` under `@theme inline { ... }`. Import via `@import "tailwindcss";`. **Current palette** is documented in `CLAUDE.md` "Theme tokens" — use `--color-primary`, `--color-muted`, `--color-card`, `--color-card-border`, `--color-accent-soft`. `--color-accent` is an alias of `--color-primary` (kept for backward compat). **Light-mode only** (D-011); don't reintroduce a `prefers-color-scheme: dark` override.
 - **React 19.2** — use latest patterns. Avoid legacy class components.
 - **SQLAlchemy 2.0 sync** — not async (per D-008). FastAPI runs sync `def` routes in a thread pool. Don't introduce `async def` with sync DB calls; pick one consistently per file.
 - **Azure OpenAI auth** uses `Authorization: Bearer <key>` (not `api-key:` header) for the `/openai/v1` compatibility endpoint.
@@ -64,8 +65,8 @@ backend/
   db/          11 SQLAlchemy models + 3 Alembic migrations
   seeds/       6 BMDC-verified doctors
 frontend/
-  src/app/             14 pages across patient + doctor portal + chamber
-  src/components/      DisclaimerBanner (more in Phase F)
+  src/app/             14 pages across patient + doctor portal + chamber; `app/page.tsx` is the post-Fix-#1 marketing landing (6 sections, all subcomponents inline)
+  src/components/      empty (DisclaimerBanner deleted in Fix #1 — see D-011; page-local subcomponents live inline in their page.tsx)
   src/lib/             api.ts (typed fetch + all response types) + i18n.ts (Bangla helpers)
 ```
 
@@ -80,6 +81,9 @@ The detailed map is in `CLAUDE.md` "Repo layout".
 - **Azure key typos** — the user once pasted with a trailing `s`. If you see HTTP 401, check `.env` key length and last 4 chars. See `docs/build-log.md` Day 2.
 - **`max_tokens` rejected by `gpt-chat-latest`** — this is a GPT-5-class model. Use `max_completion_tokens` if you need a limit, or omit (we omit).
 - **Frontend dir is `niro/frontend/`, not `frontend/`** — `mkdir frontend/...` from the wrong cwd creates a sibling repo.
+- **`DisclaimerBanner` no longer exists** — deleted in Fix #1 (D-011). Don't import it. Inline AI disclaimer copy on result pages instead.
+- **Don't recreate `prefers-color-scheme: dark`** — Phase 1 is light-mode only (D-011).
+- **Don't commit fixes to `main` directly during the issue-fix loop** — branch per issue, squash-merge after user approval. See CLAUDE.md "Issue-fix workflow".
 
 ---
 

@@ -20,9 +20,9 @@
 
 ```
 app/
-├── layout.tsx          # global: HTML lang="bn", Noto Sans Bengali, <DisclaimerBanner/>
-├── globals.css         # Tailwind 4 @theme + Bangla OpenType + print stylesheet
-├── page.tsx            # public landing
+├── layout.tsx          # global: HTML lang="bn", Noto Sans Bengali (no global banner — D-011)
+├── globals.css         # Tailwind 4 @theme + Bangla OpenType + print stylesheet + healthcare token palette
+├── page.tsx            # public marketing landing (6 sections, Fix #1 — all subcomponents inline)
 ├── signin/, verify/    # auth
 ├── home/, upload/      # patient happy path
 ├── analyses/[id]/      # patient AI result (with PDF print)

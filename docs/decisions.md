@@ -15,6 +15,16 @@ Format per decision:
 
 ---
 
+## D-011 — Landing `/` is a full marketing site (light-mode only); `DisclaimerBanner` removed
+
+- **What:** `/` is a 6-section marketing landing (sticky nav → hero with CSS phone mockup → trust strip → features → how-it-works → final CTA → footer), with a new healthcare token palette (`--color-primary` deep medical green, warm off-white background) in `globals.css`. Light-mode only — the `prefers-color-scheme: dark` override was removed. The `DisclaimerBanner` component (previously mounted globally in `layout.tsx`) was deleted.
+- **When:** 23 May 2026 (Fix #1, post-Phase-D)
+- **Owner:** kawsher-hridoy
+- **Why:** The Phase-A placeholder landing (single hero + 3 cards + ICADHI footer + flat black background) didn't feel like a professional healthcare product, blocking the Phase-1 video on 27 May. Light-mode is what hospital/clinic UIs use; dark mode was unused and forcing readers into a black page on first load was hostile. The global amber `DisclaimerBanner` cluttered every screen (auth, home, doctor portal, chamber) where it added no signal — the disclaimer copy now lives inline on AI-output pages (e.g. `analyses/[id]`) where it actually matters.
+- **Alternatives considered:** Keep dark-mode toggle (deferred — Phase F). Use a shadcn/ui `Card` + `Button` set (deferred — keeps Phase 1 dep-free). Hero illustration / framer-motion animations (rejected — adds deps for a static page). Replace `DisclaimerBanner` with a smaller pill at the nav (rejected — disclaimer belongs on AI-output pages, not the global shell).
+- **Status:** Locked for Phase 1. Reopen in Phase F if a dark-mode toggle or shadcn/ui port becomes a priority.
+- **Affected files:** `niro/frontend/src/app/page.tsx` (rewrite), `niro/frontend/src/app/layout.tsx` (remove `<DisclaimerBanner />` + import), `niro/frontend/src/app/globals.css` (new token palette, drop dark-mode override), `niro/frontend/src/components/DisclaimerBanner.tsx` (deleted). Commit: `caaa8f9`.
+
 ## D-007 — Phase A uses `postgres:16.3-alpine3.20`; pgvector deferred to Phase C
 
 - **What:** `docker-compose.yml` uses the locally-cached `postgres:16.3-alpine3.20` instead of `pgvector/pgvector:pg16` for Phase A.

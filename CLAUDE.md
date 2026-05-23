@@ -30,7 +30,8 @@ Generic-agent guidance: `AGENTS.md` (this complements that file).
 | G — Demo day                     | 15 Jun          | Conditional                          |
 
 **Phase 1 build is feature-complete on `main`.** When picking up a new
-session: read `docs/build-log.md` Day 4 entry first.
+session: read `docs/build-log.md` Day 4 entry first, then Day 5 (issue
+fixes loop, currently active — see "Issue-fix workflow" section below).
 
 ---
 
@@ -83,6 +84,35 @@ When in doubt, read the local Next.js docs:
 - Import via `@import "tailwindcss";` (not `@tailwind base; @tailwind components;`).
 - `@tailwindcss/postcss` plugin is required.
 - Custom CSS variables on `:root` flow through to `@theme inline` aliases.
+
+---
+
+## Theme tokens (post-Fix-#1 — 23 May)
+
+Live palette in `niro/frontend/src/app/globals.css`. Light-mode only (the
+`prefers-color-scheme: dark` override was removed in Fix #1). New pages
+should use these tokens, not hard-coded hex values.
+
+| Token                  | Hex       | Use                                       |
+| ---------------------- | --------- | ----------------------------------------- |
+| `--color-background`   | `#fafaf7` | Page background (warm off-white)          |
+| `--color-foreground`   | `#1a1f1c` | Body text (slightly green-tinted black)   |
+| `--color-primary`      | `#0f7b4a` | Buttons, links, hero accents              |
+| `--color-primary-hover`| `#0a5e38` | Primary hover state                       |
+| `--color-muted`        | `#6b7570` | Secondary text, captions                  |
+| `--color-card`         | `#ffffff` | Card / panel backgrounds                  |
+| `--color-card-border`  | `#e7e5df` | Card / section dividers                   |
+| `--color-accent-soft`  | `#e8f4ed` | Soft tints (badges, hero blur shapes)     |
+| `--color-accent`       | `#0f7b4a` | **Alias** of `--color-primary` — kept so existing `text-accent`/`bg-accent` utility classes on patient + doctor pages keep working without a churn-fix |
+
+Apply via arbitrary values: `className="bg-[var(--color-primary)] text-white"`,
+or via Tailwind utilities (`bg-primary`, `text-muted`, etc.) generated
+from `@theme inline`. Both work because the tokens live on `:root`.
+
+**Don't:**
+- Don't reintroduce a `prefers-color-scheme: dark` override (light-mode is locked — see D-011).
+- Don't add a hex literal where a token would do.
+- Don't repurpose `--color-accent` as a separate hue — it's an alias.
 
 ---
 
@@ -164,7 +194,7 @@ single switch point.
         ├── AGENTS.md, CLAUDE.md  # Next.js's own warnings — DON'T DELETE
         └── src/
             ├── app/
-            │   ├── layout.tsx, globals.css (print stylesheet), page.tsx
+            │   ├── layout.tsx, globals.css (print stylesheet), page.tsx (marketing landing — Fix #1)
             │   ├── signin/, verify/
             │   ├── home/, upload/, timeline/, access-log/
             │   ├── analyses/[id]/ (with 🖨 PDF via window.print)
@@ -175,8 +205,7 @@ single switch point.
             │       ├── inbox/
             │       ├── cases/[id]/
             │       └── chamber/    # QR + 2s polling state machine
-            ├── components/
-            │   └── DisclaimerBanner.tsx
+            ├── components/        # empty as of Fix #1 (DisclaimerBanner deleted; landing page-local subcomponents live inline in page.tsx)
             └── lib/
                 ├── api.ts          # typed fetch wrapper + all response types
                 └── i18n.ts         # toBangla, timeAgoBn
@@ -198,6 +227,7 @@ single switch point.
 | **D-008** | Sync SQLAlchemy 2.0 (not async)                                               | `backend/db/session.py`                 |
 | **D-009** | OTP storage: `sha256(salt:code)` (not bcrypt) — passlib + bcrypt 5.x incompat | `backend/api/routers/auth.py`           |
 | **D-010** | PDF "export" via browser print stylesheet (not WeasyPrint)                    | `globals.css`, `analyses/[id]/page.tsx` |
+| **D-011** | Landing `/` is a full marketing site (6 sections, light-mode only, no global disclaimer banner) | `app/page.tsx`, `app/globals.css`, `app/layout.tsx` |
 
 See `docs/decisions.md` for rationale + alternatives on each.
 
@@ -218,6 +248,7 @@ See `docs/decisions.md` for rationale + alternatives on each.
 - Every AI call logged via `services.audit.record()` with: model+version, prompt SHA256, output SHA256, confidence, timestamp.
 - `recommend_human_review` flag surfaces in UI when confidence < 0.5.
 - `policy.assert_compliant()` runs on every AI return; violation → audit + 422.
+- **Disclaimer copy lives on the AI result pages, not globally.** The standalone `DisclaimerBanner` component was deleted in Fix #1 (it was visually heavy on every screen). The visible "this is not medical advice" message must still appear in any UI that shows AI output — see `app/analyses/[id]/page.tsx` for the pattern, and add an inline disclaimer on any new AI-output surface.
 
 ### Consent and privacy
 
@@ -277,9 +308,27 @@ docker compose exec -T postgres psql -U niro -d niro \
 
 - Python: ruff + black defaults; type hints on public functions.
 - TypeScript: strict mode on. Default to server components; mark client with `"use client"` only when needed.
-- Commits: imperative mood with scope prefix (`backend:`, `frontend:`, `ai:`, `docs:`, `phase-<x>:`).
+- Commits: imperative mood with scope prefix (`backend:`, `frontend:`, `ai:`, `docs:`, `phase-<x>:`, `fix:`).
 - One concern per PR. Each phase is squashed-merged.
 - Update `docs/build-log.md` at the end of every session.
+
+---
+
+## Issue-fix workflow (active since 23 May — see Day 5 build-log)
+
+Phase 1 build is on `main`. The current loop is **branch-per-issue fixes
+driven by the user**. Future agents picking up mid-loop must follow this
+algorithm — do not commit fixes directly to `main`:
+
+1. **Branch off `main`:** `git checkout main && git checkout -b fix/<short-slug>`.
+2. **Investigate** the targeted files only. Confirm the issue before editing.
+3. **Edit** uncommitted; dev server hot-reloads. Report which files changed.
+4. **User verifies** in the browser. They say "approved" or describe what's still wrong.
+5a. **Approved** → commit on branch → `git checkout main && git merge --squash fix/<slug>` → squash commit with `fix(<scope>): <summary> (#fix-N)` → delete branch → append a Day-5 entry to `docs/build-log.md` → push only when the user explicitly asks.
+5b. **Rejected** → `git restore .` (small tweak) or `git checkout main && git branch -D fix/<slug>` (wrong approach), then iterate.
+
+The full workflow plan lives at `/home/l0minex/.claude/plans/twinkly-inventing-pebble.md` v2.0.
+`main` is the safety net — never force-push, never `git reset --hard main`.
 
 ---
 
@@ -295,6 +344,9 @@ docker compose exec -T postgres psql -U niro -d niro \
 - Don't reach for bcrypt for short-lived secrets (D-009).
 - Don't try to use `images.domains` (deprecated in Next 16).
 - Don't pull `pgvector/pgvector:pg16` blindly — Docker Hub IPv6 is broken on this network (D-007).
+- **Don't recreate `DisclaimerBanner`** — deleted in Fix #1 (D-011). If you need to add a disclaimer on an AI-output page, render it inline at the top of that page.
+- **Don't reintroduce dark mode** for Phase 1 — the `prefers-color-scheme: dark` override was removed in Fix #1 (D-011). Light-mode only until explicitly reopened.
+- **Don't commit a fix directly to `main`** — use the issue-fix workflow above (branch per issue → squash-merge after user approval).
 
 ---
 

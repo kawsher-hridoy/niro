@@ -579,9 +579,11 @@ pydantic-settings reading `.env`. **The only place env vars are read.** Don't `o
 
 ### Frontend components
 
-| Component | Responsibility |
-|---|---|
-| `DisclaimerBanner.tsx` | Always-visible amber banner "এটি চিকিৎসা পরামর্শ নয়।" — the visible promise that AI never gives final medical advice |
+`src/components/` is empty as of Fix #1. The previous global
+`DisclaimerBanner` was removed (see D-011 in `docs/decisions.md`) —
+disclaimer copy now appears inline on AI-output pages
+(e.g. `analyses/[id]/page.tsx`) rather than as a global banner.
+Landing-page subcomponents live inline in `app/page.tsx`.
 
 ---
 
@@ -665,8 +667,8 @@ Full system design with rationale: [`DESIGN.md`](DESIGN.md).
     │   └── seeds/                    # 6 seeded doctors
     └── frontend/                     # Next.js 16
         └── src/
-            ├── app/                  # 14 pages
-            ├── components/           # DisclaimerBanner
+            ├── app/                  # 14 pages (incl. marketing landing in page.tsx)
+            ├── components/           # empty (DisclaimerBanner removed in Fix #1, D-011)
             └── lib/                  # api.ts, i18n.ts
 ```
 

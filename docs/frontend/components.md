@@ -1,7 +1,8 @@
 # Frontend — Components & Pages Inventory
 
-Actual inventory as built through Phase D. **14 pages, 1 component**
-(more to come in Phase F polish).
+Actual inventory as built through Phase D + Fix #1. **14 pages, 0 extracted
+components** (landing-page subcomponents live inline in `app/page.tsx`;
+candidates for extraction tracked under "Phase F polish targets" below).
 
 ## Pages (14)
 
@@ -9,7 +10,7 @@ Actual inventory as built through Phase D. **14 pages, 1 component**
 
 | Path | File |
 |---|---|
-| `/` | `app/page.tsx` (server) |
+| `/` | `app/page.tsx` (server) — post-Fix-#1: 6-section marketing landing. Subcomponents inline: `SiteNav`, `Hero`, `PhoneMockup`, `TrustStrip`, `Stat`, `Features`, `FeatureCard`, `HowItWorks`, `Step`, `FinalCTA`, `SiteFooter`. |
 
 ### Auth (2)
 
@@ -47,11 +48,16 @@ Actual inventory as built through Phase D. **14 pages, 1 component**
 | `/doctor-portal/cases/[id]` | `app/doctor-portal/cases/[id]/page.tsx` | AI case-summary + target analysis + history + review form |
 | `/doctor-portal/chamber` | `app/doctor-portal/chamber/page.tsx` | 4-phase state machine: init → waiting (QR + 2s poll) → bound → closed |
 
-## Components (1)
+## Components (0 extracted)
 
-| Component | File | Props | Used in |
-|---|---|---|---|
-| `DisclaimerBanner` | `components/DisclaimerBanner.tsx` | — | Global, mounted in `layout.tsx` |
+`src/components/` is empty as of Fix #1. The previous global
+`DisclaimerBanner` was removed (D-011); disclaimer copy now appears
+inline on AI-output pages instead of as a global banner.
+
+Landing-page subcomponents (`SiteNav`, `Hero`, `PhoneMockup`,
+`FeatureCard`, `Step`, etc.) live as local functions inside
+`app/page.tsx` — extract to `src/components/` only when reused on a
+second page.
 
 ## Conventions
 
