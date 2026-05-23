@@ -134,6 +134,52 @@ the diff (commit hash or branch). Keep it under 200 words per day.
 
 ---
 
+## Day 3 — 23 May 2026 (later)
+
+**Phase:** C — Profile + verification + doctor portal.
+
+**Shipped (backend):**
+- Migration `28e9c4a069e8` — `verification_requests`, `verification_reviews`, `doctor_reviews`, `chamber_sessions`.
+- `backend/seeds/doctors.py` — seeds 6 BMDC-verified doctors (Dr. Mahmudul Hasan / Bijoy / Farzana / Tariq / Sumaiya / Rashed) across specialties (diabetes, medicine, eye, cardiology, pediatrics, ENT). Idempotent.
+- `routers/profile.py` — `/me`, `/me/timeline` (merges documents + analyses + reviews chronologically), `/me/access-log`, `DELETE /me`.
+- `routers/consent.py` — `POST /consents` + `POST /consents/{id}/revoke`.
+- `routers/verifications.py` — `POST /verifications` (creates consent + request), `POST /verifications/{id}/pay` (2s mock paid), `GET /verifications`, `GET /verifications/{id}`.
+- `routers/doctor.py` — `/doctor/inbox`, `/doctor/cases/{id}` (consent-gated load, **on-demand AI case summary** via `prepare_case_summary`, writes access log + audit), `/doctor/cases/{id}/review`.
+- `routers/doctors.py` — public directory `GET /doctors?specialty=&fee_tier=&q=`, `GET /doctors/{id}` with reviews, `POST /doctors/{id}/reviews` (only verified-consult patients).
+- All 17 new endpoints registered in `backend/main.py`.
+
+**Shipped (frontend):**
+- Extended `src/lib/api.ts` with `TimelineEntry`, `AccessLogEntry`, `DoctorCard`, `DoctorProfileOut`, `VerificationOut`, `CaseView` types.
+- `/timeline` — chronological vertical timeline with entry-type chips.
+- `/doctors` — directory with specialty + fee-tier + name filters.
+- `/doctors/[id]` — full doctor profile + qualifications + chambers + reviews + "request verification" panel listing the patient's own documents.
+- `/verifications` — list of patient's verification requests with status chips.
+- `/verifications/[id]` — verification detail with mock-pay button, auto-refresh while doctor reviews.
+- `/access-log` — patient-visible doctor access log.
+- `/doctor-portal/inbox` — doctor inbox split into Pending / Done.
+- `/doctor-portal/cases/[id]` — case review page with AI summary, target analysis, history, review form.
+- `/home` updated with nav chips to all the new pages.
+- All TypeScript still type-checks (0 errors).
+
+**Verified end-to-end:**
+- Patient: signin → list 6 doctors → filter by `specialty=diabetes` → upload prescription → analyze → request verification (auto-creates consent) → mock-pay (2s).
+- Doctor: signin as `+88017000DOCTR1` (Dr. Mahmudul Hasan) → inbox shows the pending case → open case (triggers AI case summary in 8.8s — 6 meds, 3 concerns, 5 questions for doctor in Bangla) → submit review (`agree`).
+- Patient: timeline now shows `review → analysis → document` chronologically; access log shows "Dr. Mahmudul Hasan viewed case_summary"; verifications list shows status `paid` with `review_disposition: agree`.
+- Audit log: 10 distinct event types — `auth.*`, `document.upload`, `ai.analyze.document`, `ai.analyze.history_aware`, `ai.case_summary`, `consent.granted`, `payment.mock_paid`, `doctor.view.case_summary`, `doctor.review.submitted`.
+
+**Didn't ship (deferred to Phase D):**
+- Chamber QR flow.
+- PDF export.
+- QR scanner.
+
+**Issues:** none meaningful — minor cosmetic "Dr. Dr. Foo" prefixing (UI prepends "Dr." but seeded names already include it). Will clean up in Phase D polish.
+
+**Smoke test status:** Phase C exit criteria all green.
+
+**Commit:** branch `phase-c/verification-doctor`, hash TBD.
+
+---
+
 ## Template for new entries
 
 ```markdown

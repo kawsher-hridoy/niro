@@ -46,6 +46,33 @@ export default function PatientHome() {
         </button>
       </header>
 
+      <nav className="flex flex-wrap gap-2 text-sm">
+        <Link
+          href="/timeline"
+          className="px-3 py-1.5 rounded-md border border-foreground/15 hover:bg-foreground/5"
+        >
+          টাইমলাইন
+        </Link>
+        <Link
+          href="/doctors"
+          className="px-3 py-1.5 rounded-md border border-foreground/15 hover:bg-foreground/5"
+        >
+          ডাক্তার ডিরেক্টরি
+        </Link>
+        <Link
+          href="/verifications"
+          className="px-3 py-1.5 rounded-md border border-foreground/15 hover:bg-foreground/5"
+        >
+          যাচাই অনুরোধ
+        </Link>
+        <Link
+          href="/access-log"
+          className="px-3 py-1.5 rounded-md border border-foreground/15 hover:bg-foreground/5"
+        >
+          অ্যাক্সেস লগ
+        </Link>
+      </nav>
+
       <Link
         href="/upload"
         className="rounded-2xl border-2 border-dashed border-accent/40 hover:border-accent bg-accent/[0.04] hover:bg-accent/[0.07] transition px-6 py-8 flex flex-col items-center gap-2 text-center"

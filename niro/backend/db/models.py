@@ -261,3 +261,121 @@ class AuditLog(Base):
         Index("ix_audit_log_ts", "ts"),
         Index("ix_audit_log_patient", "patient_id", "ts"),
     )
+
+
+# ---------- Phase C ----------
+
+class VerificationRequest(Base):
+    __tablename__ = "verification_requests"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    doctor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    consent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("consents.id", ondelete="CASCADE"), nullable=False
+    )
+    fee_bdt: Mapped[int] = mapped_column(Integer, nullable=False)
+    payment_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending"
+    )
+    transaction_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ai_summary_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    due_by: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "payment_status IN ('pending','paid','refunded','failed')",
+            name="ck_verification_requests_payment_status",
+        ),
+        Index("ix_verification_requests_doctor_status", "doctor_id", "payment_status"),
+        Index("ix_verification_requests_patient", "patient_id", "created_at"),
+    )
+
+
+class VerificationReview(Base):
+    __tablename__ = "verification_reviews"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("verification_requests.id", ondelete="CASCADE"),
+        nullable=False, unique=True,
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    doctor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    disposition: Mapped[str] = mapped_column(String(16), nullable=False)
+    ai_claims_eval: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")
+    doctor_notes_bn: Mapped[str] = mapped_column(Text, nullable=False)  # ★
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "disposition IN ('agree','concerns','escalate')",
+            name="ck_verification_reviews_disposition",
+        ),
+    )
+
+
+class DoctorReview(Base):
+    __tablename__ = "doctor_reviews"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    doctor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    verification_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("verification_requests.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        CheckConstraint("rating BETWEEN 1 AND 5", name="ck_doctor_reviews_rating"),
+        Index("ix_doctor_reviews_doctor", "doctor_id"),
+    )
+
+
+class ChamberSession(Base):
+    __tablename__ = "chamber_sessions"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    doctor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    consent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("consents.id"), nullable=True
+    )
+    qr_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    bound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    chamber_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
