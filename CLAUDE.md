@@ -8,8 +8,9 @@ engineering-focused. Product spec is `PROJECT.md`. Don't duplicate it.
 ## What this project is
 
 **Niro** — patient-owned medical record + AI document analyzer (Bangla)
-+ on-demand doctor verification. Submitted to **IEEE ICADHI 2026 Project
-Showcase, Track 1** (AI-Driven Telemedicine).
+
+- on-demand doctor verification. Submitted to **IEEE ICADHI 2026 Project
+  Showcase, Track 1** (AI-Driven Telemedicine).
 
 Full product spec: `PROJECT.md`. System design: `DESIGN.md`.
 Generic-agent guidance: `AGENTS.md` (this complements that file).
@@ -18,15 +19,15 @@ Generic-agent guidance: `AGENTS.md` (this complements that file).
 
 ## Status (live)
 
-| Phase | Window | Status |
-|---|---|---|
-| A — Foundation | 23 May (Day 1) | ✅ **Merged** (PR #1) |
-| B — AI + upload | 23 May | ✅ **Merged** (PR #2) |
-| C — Profile + verification | 23 May | ✅ **Merged** (PR #3) |
-| D — Chamber + directory + polish | 23 May | ✅ **Merged** (PR #4) |
-| **E — Video submission** | 27 May | ⏳ **User action** — record + submit |
-| F — Live-demo polish | 28 May – 14 Jun | Conditional on 30 May shortlist |
-| G — Demo day | 15 Jun | Conditional |
+| Phase                            | Window          | Status                               |
+| -------------------------------- | --------------- | ------------------------------------ |
+| A — Foundation                   | 23 May (Day 1)  | ✅ **Merged** (PR #1)                |
+| B — AI + upload                  | 23 May          | ✅ **Merged** (PR #2)                |
+| C — Profile + verification       | 23 May          | ✅ **Merged** (PR #3)                |
+| D — Chamber + directory + polish | 23 May          | ✅ **Merged** (PR #4)                |
+| **E — Video submission**         | 27 May          | ⏳ **User action** — record + submit |
+| F — Live-demo polish             | 28 May – 14 Jun | Conditional on 30 May shortlist      |
+| G — Demo day                     | 15 Jun          | Conditional                          |
 
 **Phase 1 build is feature-complete on `main`.** When picking up a new
 session: read `docs/build-log.md` Day 4 entry first.
@@ -35,16 +36,16 @@ session: read `docs/build-log.md` Day 4 entry first.
 
 ## Live tech stack (what's actually installed)
 
-| Layer | Locked version | Notes |
-|---|---|---|
-| Python | 3.12.3 (system) | Managed by `uv` |
-| Dep manager | `uv` 0.11.x | 10-100× faster than pip; venv at `niro/.venv` |
-| Backend | FastAPI 0.115, SQLAlchemy 2.0.49, Alembic 1.14, psycopg 3 (binary), pydantic-settings, structlog | Sync routes by design — see D-008 |
-| AI provider | Azure OpenAI `gpt-chat-latest` (Preview, retires 5 Aug 2026) | Endpoint `https://ai-for-security.services.ai.azure.com/openai/v1`. **Use `Authorization: Bearer ...` header, not `api-key:`** |
-| DB | `postgres:16.3-alpine3.20` (cached locally — see D-007) | pgvector deferred; Phase 1 has no vector queries |
-| Frontend | **Next.js 16.2.6** (App Router, Turbopack default), React 19.2, Tailwind 4 | See "Next.js 16 gotchas" below |
-| Auth | Phone OTP (mock `123456` in dev), JWT HS256 | OTP storage: sha256(salt:code) — see D-009 |
-| Hosting | Local dev now, single VPS later (Caddy + systemd) | Phase F4 |
+| Layer       | Locked version                                                                                   | Notes                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Python      | 3.12.3 (system)                                                                                  | Managed by `uv`                                                                                                                |
+| Dep manager | `uv` 0.11.x                                                                                      | 10-100× faster than pip; venv at `niro/.venv`                                                                                  |
+| Backend     | FastAPI 0.115, SQLAlchemy 2.0.49, Alembic 1.14, psycopg 3 (binary), pydantic-settings, structlog | Sync routes by design — see D-008                                                                                              |
+| AI provider | Azure OpenAI `gpt-chat-latest` (Preview, retires 5 Aug 2026)                                     | Endpoint `https://ai-for-security.services.ai.azure.com/openai/v1`. **Use `Authorization: Bearer ...` header, not `api-key:`** |
+| DB          | `postgres:16.3-alpine3.20` (cached locally — see D-007)                                          | pgvector deferred; Phase 1 has no vector queries                                                                               |
+| Frontend    | **Next.js 16.2.6** (App Router, Turbopack default), React 19.2, Tailwind 4                       | See "Next.js 16 gotchas" below                                                                                                 |
+| Auth        | Phone OTP (mock `123456` in dev), JWT HS256                                                      | OTP storage: sha256(salt:code) — see D-009                                                                                     |
+| Hosting     | Local dev now, single VPS later (Caddy + systemd)                                                | Phase F4                                                                                                                       |
 
 ---
 
@@ -56,8 +57,8 @@ training may not reflect:
 1. **Turbopack is default.** `next dev` and `next build` use it without flags. Don't add `--turbopack`.
 2. **Async request APIs.** `params`, `searchParams`, `cookies()`, `headers()`, `draftMode()` are now **Promises**. Pages with dynamic routes must:
    ```ts
-   export default async function Page(props: PageProps<'/blog/[slug]'>) {
-     const { slug } = await props.params
+   export default async function Page(props: PageProps<"/blog/[slug]">) {
+     const { slug } = await props.params;
    }
    ```
    We use the `use(params)` hook in client components per `app/analyses/[id]/page.tsx`.
@@ -185,18 +186,18 @@ single switch point.
 
 ## Locked decisions (full table)
 
-| ID | Decision | Where it shows up |
-|---|---|---|
-| **D-001** | Submit to ICADHI Track 1 (Telemedicine) | ICADHI portal, all demo docs |
-| **D-002** | Keep DESIGN.md intact, add docs/ folder alongside | This file structure |
-| **D-003** | FastAPI + Next.js 15 (now 16) + Postgres + pgvector | All code |
-| **D-004** | Azure OpenAI `gpt-chat-latest` as primary | `.env`, `backend/ai/azure.py` |
-| **D-005** | Project name = Niro | Everywhere |
-| **D-006** | Phase A docs-skeleton-first | Done |
-| **D-007** | Use `postgres:16.3-alpine3.20` for Phase A; pgvector deferred | `docker-compose.yml` |
-| **D-008** | Sync SQLAlchemy 2.0 (not async) | `backend/db/session.py` |
-| **D-009** | OTP storage: `sha256(salt:code)` (not bcrypt) — passlib + bcrypt 5.x incompat | `backend/api/routers/auth.py` |
-| **D-010** | PDF "export" via browser print stylesheet (not WeasyPrint) | `globals.css`, `analyses/[id]/page.tsx` |
+| ID        | Decision                                                                      | Where it shows up                       |
+| --------- | ----------------------------------------------------------------------------- | --------------------------------------- |
+| **D-001** | Submit to ICADHI Track 1 (Telemedicine)                                       | ICADHI portal, all demo docs            |
+| **D-002** | Keep DESIGN.md intact, add docs/ folder alongside                             | This file structure                     |
+| **D-003** | FastAPI + Next.js 15 (now 16) + Postgres + pgvector                           | All code                                |
+| **D-004** | Azure OpenAI `gpt-chat-latest` as primary                                     | `.env`, `backend/ai/azure.py`           |
+| **D-005** | Project name = Niro                                                           | Everywhere                              |
+| **D-006** | Phase A docs-skeleton-first                                                   | Done                                    |
+| **D-007** | Use `postgres:16.3-alpine3.20` for Phase A; pgvector deferred                 | `docker-compose.yml`                    |
+| **D-008** | Sync SQLAlchemy 2.0 (not async)                                               | `backend/db/session.py`                 |
+| **D-009** | OTP storage: `sha256(salt:code)` (not bcrypt) — passlib + bcrypt 5.x incompat | `backend/api/routers/auth.py`           |
+| **D-010** | PDF "export" via browser print stylesheet (not WeasyPrint)                    | `globals.css`, `analyses/[id]/page.tsx` |
 
 See `docs/decisions.md` for rationale + alternatives on each.
 
@@ -205,25 +206,28 @@ See `docs/decisions.md` for rationale + alternatives on each.
 ## Hard rules (do not violate)
 
 ### Security
+
 - Never commit `.env`, real API keys, or PHI to git.
 - All secrets via env vars. `pydantic-settings` is the only allowed reader.
 - TLS everywhere in prod. No plain HTTP.
 - PHI columns marked **★** in `niro/backend/db/models.py`.
 
 ### AI safety
+
 - AI never gives final medical advice — only extracts, explains, flags.
-- Every AI output carries a visible disclaimer (`DisclaimerBanner` global).
 - Every AI call logged via `services.audit.record()` with: model+version, prompt SHA256, output SHA256, confidence, timestamp.
 - `recommend_human_review` flag surfaces in UI when confidence < 0.5.
 - `policy.assert_compliant()` runs on every AI return; violation → audit + 422.
 
 ### Consent and privacy
+
 - Doctor never sees patient data without explicit, time-bound consent.
 - Default consent expiry: 24h (verification flow) / 2h (chamber flow).
 - Every doctor view logged via `consent.record_access()` → both `access_logs` (patient-visible) and `audit_log` (forensic).
 - Patient can delete all their data via `DELETE /api/v1/me` (DPA 2023 compliant).
 
 ### Bangla-first
+
 - Default UI language is Bangla. English is a toggle (Phase F).
 - Use Bangla numerals (২৪৫) via `lib/i18n.ts toBangla()`.
 - Body font: Noto Sans Bengali via `next/font/google`.
