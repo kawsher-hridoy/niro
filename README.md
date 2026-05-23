@@ -136,34 +136,71 @@ cd niro
 cp .env.example .env
 # Edit .env — set AZURE_OPENAI_KEY=<your key>
 
-# 3. Start Postgres
-docker compose up -d postgres
+# 3. First-time setup (creates venv, installs deps, applies migrations, seeds doctors)
+./niro.sh setup
 
-# 4. Backend (terminal A)
-cd niro
-uv venv --python 3.12 .venv
-source .venv/bin/activate
-uv pip install -e ./backend
-alembic -c alembic.ini upgrade head        # apply migrations
-python -m backend.seeds.doctors            # seed 6 BMDC doctors
-uvicorn backend.main:app --reload --port 8000
+# 4. Start everything (Postgres + backend + frontend)
+./niro.sh start
 
-# 5. Frontend (terminal B)
-cd niro/frontend
-npm install
-npm run dev
+# 5. Open http://localhost:3000
 
-# 6. Open http://localhost:3000
+# Stop it later:
+./niro.sh stop
 ```
 
-If `http://localhost:3000/api/v1/health` returns `{"ok":true}` and the
+That's it. See [Running the app with `niro.sh`](#running-the-app-with-niroh)
+below for everything the script does.
+
+If `http://localhost:8000/api/v1/health` returns `{"ok":true}` and the
 landing page shows **নিরো** in green Bangla, you're ready.
 
 Re-verify the AI provider any time:
 
 ```bash
-cd niro && set -a && source ../.env && set +a && .venv/bin/python probe.py
-# expected: 6/6 tests passed
+./niro.sh probe        # 6/6 tests passed
+```
+
+## Running the app with `niro.sh`
+
+The repo ships a single control script for the whole stack. One command
+to start, one to stop. PIDs and logs live in `.niro-run/` (gitignored).
+
+```
+./niro.sh setup           # first-time only
+./niro.sh start           # bring up Postgres + backend + frontend
+./niro.sh status          # show what's running, last log lines
+./niro.sh logs            # tail backend + frontend together
+./niro.sh restart         # stop + start
+./niro.sh stop            # stop backend + frontend (Postgres stays)
+./niro.sh stop --with-db  # also stop Postgres container
+./niro.sh probe           # re-run the AI capability probe (6 tests)
+./niro.sh nuke            # stop + delete local data + caches (asks first)
+./niro.sh help            # full reference
+```
+
+Everything is idempotent — `./niro.sh start` is safe to run twice;
+already-running services are detected and left alone.
+
+What you see after `./niro.sh start`:
+
+```
+Niro · starting
+✓ Postgres ready on :5432
+• Applying migrations (no-op if at head)...
+✓ Migrations applied.
+• Starting backend on :8000 ...
+✓ Backend running on http://localhost:8000 (pid 981330).
+✓ Backend /api/v1/health returns 200.
+• Starting frontend on :3000 (Turbopack)...
+✓ Frontend running on http://localhost:3000 (pid 981399).
+
+Niro is up
+  Patient app:    http://localhost:3000
+  API health:     http://localhost:8000/api/v1/health
+  Swagger:        http://localhost:8000/docs
+
+  Patient login: any phone, OTP 123456
+  Doctor login : phone +88017000DOCTR1 (through DOCTR6), OTP 123456
 ```
 
 ---
