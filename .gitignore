@@ -1,0 +1,63 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# Build outputs
+dist/
+build/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Patient data — never commit any real medical document
+niro/uploads/
+niro/data/patients/
+*.dcm
+real_rx*.jpg
+real_rx*.png
+real_lab*.jpg
+real_lab*.png
+
+# Local DB
+*.db
+*.sqlite
+*.sqlite3
+
+# Claude Code local state — keep skill and config, ignore everything else
+.claude/projects/
+.claude/tool-results/
+.claude/*.log
