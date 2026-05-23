@@ -25,6 +25,26 @@ Format per decision:
 - **Status:** Provisional. Swap to `pgvector/pgvector:pg16` in Phase C when the RAG migration lands — by then network may be fine, or we'll need a custom Dockerfile.
 - **Affected files:** `docker-compose.yml`, `docs/deployment/docker-compose.md`, `docs/architecture/storage.md` (pgvector mentions)
 
+## D-010 — PDF export via browser `window.print()` (not WeasyPrint)
+
+- **What:** The "Save as PDF" feature on `/analyses/[id]` calls `window.print()`. A `@media print` stylesheet in `globals.css` hides nav/buttons/banners. User picks "Save as PDF" in the browser's print dialog.
+- **When:** 23 May 2026 (Phase D)
+- **Owner:** kawsher-hridoy
+- **Why:** WeasyPrint needs Cairo + Pango system deps that add ~100 MB to the deploy image and 30 min of Docker setup. Playwright server-side needs Chromium (~150 MB). Both for a feature judges will use once. Browser print is identical output, zero added deps.
+- **Alternatives considered:** WeasyPrint; Playwright; ReportLab. All deferred.
+- **Status:** Locked for Phase 1.
+- **Affected files:** `niro/frontend/src/app/globals.css`, `niro/frontend/src/app/analyses/[id]/page.tsx`
+
+## D-009 — OTP storage: `sha256(salt:code)` (not bcrypt)
+
+- **What:** OTP codes stored as `salt$sha256(salt:code)` in `otp_codes.code_hash`; verified via `hmac.compare_digest`.
+- **When:** 23 May 2026 (Phase B)
+- **Owner:** kawsher-hridoy
+- **Why:** `passlib`'s bcrypt backend init fails on bcrypt 5.x (the new bcrypt removed `__about__`). For 6-digit codes with 10-minute TTL, bcrypt's cost factor offers no security benefit — sha256+salt with constant-time comparison is sufficient.
+- **Alternatives considered:** Pin `bcrypt<4.0`; passlib's pbkdf2; argon2.
+- **Status:** Locked. Reconsider if we ever store actual passwords (we currently don't).
+- **Affected files:** `niro/backend/api/routers/auth.py`
+
 ## D-008 — Sync SQLAlchemy 2.0 (not async)
 
 - **What:** Backend uses sync SQLAlchemy 2.0 + sync FastAPI routes (with `def`, not `async def`). FastAPI runs `def` routes in a thread pool, which is fine for our workload.

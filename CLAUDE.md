@@ -12,7 +12,7 @@ engineering-focused. Product spec is `PROJECT.md`. Don't duplicate it.
 Showcase, Track 1** (AI-Driven Telemedicine).
 
 Full product spec: `PROJECT.md`. System design: `DESIGN.md`.
-Implementation plan: see commit history + `docs/decisions.md`.
+Generic-agent guidance: `AGENTS.md` (this complements that file).
 
 ---
 
@@ -20,34 +20,35 @@ Implementation plan: see commit history + `docs/decisions.md`.
 
 | Phase | Window | Status |
 |---|---|---|
-| A — Foundation | 23 May (Day 1) | **Complete** — PR #1 merged onto `main` |
-| B — AI + upload | 24 May (Day 2) | Pending |
-| C — Profile + verification | 25 May (Day 3) | Pending |
-| D — Chamber + directory + polish | 26 May (Day 4) | Pending |
-| E — Submit Phase-1 video | 27 May (Day 5) | Pending |
+| A — Foundation | 23 May (Day 1) | ✅ **Merged** (PR #1) |
+| B — AI + upload | 23 May | ✅ **Merged** (PR #2) |
+| C — Profile + verification | 23 May | ✅ **Merged** (PR #3) |
+| D — Chamber + directory + polish | 23 May | ✅ **Merged** (PR #4) |
+| **E — Video submission** | 27 May | ⏳ **User action** — record + submit |
 | F — Live-demo polish | 28 May – 14 Jun | Conditional on 30 May shortlist |
 | G — Demo day | 15 Jun | Conditional |
 
-When picking up a session: read `docs/build-log.md` last entry first.
+**Phase 1 build is feature-complete on `main`.** When picking up a new
+session: read `docs/build-log.md` Day 4 entry first.
 
 ---
 
-## Live tech stack (what's actually installed, not what was planned)
+## Live tech stack (what's actually installed)
 
 | Layer | Locked version | Notes |
 |---|---|---|
-| Python | 3.12.3 (system) | Managed by uv |
-| Dep manager | `uv` 0.11.x | 10-100× faster than pip |
+| Python | 3.12.3 (system) | Managed by `uv` |
+| Dep manager | `uv` 0.11.x | 10-100× faster than pip; venv at `niro/.venv` |
 | Backend | FastAPI 0.115, SQLAlchemy 2.0.49, Alembic 1.14, psycopg 3 (binary), pydantic-settings, structlog | Sync routes by design — see D-008 |
-| AI provider | Azure OpenAI `gpt-chat-latest` (Preview, retires 5 Aug 2026) | Endpoint `https://ai-for-security.services.ai.azure.com/openai/v1`. Account is not user's — `jamontedominguez105@gmail.com`, fine for ICADHI, migrate post-final |
-| DB | `postgres:16.3-alpine3.20` (cached locally, not pgvector — see D-007) | Phase A migrations don't need vectors; swap in Phase C |
-| Frontend | **Next.js 16.2.6** (App Router, Turbopack default), React 19.2, Tailwind 4 | Newer than the plan said; see "Next.js 16 gotchas" below |
-| Auth | Phone OTP (mock `123456` in dev) | JWT planned in Phase B |
+| AI provider | Azure OpenAI `gpt-chat-latest` (Preview, retires 5 Aug 2026) | Endpoint `https://ai-for-security.services.ai.azure.com/openai/v1`. **Use `Authorization: Bearer ...` header, not `api-key:`** |
+| DB | `postgres:16.3-alpine3.20` (cached locally — see D-007) | pgvector deferred; Phase 1 has no vector queries |
+| Frontend | **Next.js 16.2.6** (App Router, Turbopack default), React 19.2, Tailwind 4 | See "Next.js 16 gotchas" below |
+| Auth | Phone OTP (mock `123456` in dev), JWT HS256 | OTP storage: sha256(salt:code) — see D-009 |
 | Hosting | Local dev now, single VPS later (Caddy + systemd) | Phase F4 |
 
 ---
 
-## ⚠️ Next.js 16 gotchas — read before writing frontend code
+## ⚠️ Next.js 16 gotchas — read before frontend code
 
 These are the breaking changes from Next.js 14/15 that the model's
 training may not reflect:
@@ -59,15 +60,16 @@ training may not reflect:
      const { slug } = await props.params
    }
    ```
+   We use the `use(params)` hook in client components per `app/analyses/[id]/page.tsx`.
 3. **`next lint` removed.** Use ESLint CLI directly (`npx eslint .`) or Biome. `next build` no longer lints.
-4. **`middleware.ts` is now `proxy.ts`.** Same idea, different name. Edge runtime is **NOT** supported in `proxy`; runtime is `nodejs`.
+4. **`middleware.ts` is now `proxy.ts`.** Edge runtime is **NOT** supported in `proxy`; runtime is `nodejs`.
 5. **`images.domains` deprecated.** Use `images.remotePatterns`.
-6. **`serverRuntimeConfig` / `publicRuntimeConfig` removed.** Use env vars + `connection()` from `next/server` for runtime reads.
+6. **`serverRuntimeConfig` / `publicRuntimeConfig` removed.** Use env vars + `connection()` from `next/server`.
 7. **PPR via `cacheComponents: true`** at top-level config (not `experimental.ppr`).
-8. **`revalidateTag` requires 2 args** now — pass a `cacheLife` profile (e.g. `'max'`). Single-arg form deprecated.
-9. **`allowedDevOrigins`** needed in `next.config.ts` when dev resources are accessed from anything other than `localhost` (including `127.0.0.1`).
+8. **`revalidateTag` requires 2 args** now — pass a `cacheLife` profile.
+9. **`allowedDevOrigins`** needed in `next.config.ts` for non-`localhost` dev access (we have `["127.0.0.1"]` set).
 10. **`next dev` output is `.next/dev`**, not `.next`. Build output is `.next/`.
-11. **AGENTS.md/CLAUDE.md in `niro/frontend/`** warn AI agents to read `node_modules/next/dist/docs/` before writing code — heed it.
+11. **`AGENTS.md` + `CLAUDE.md` in `niro/frontend/`** are Next's own warnings — **don't delete**.
 
 When in doubt, read the local Next.js docs:
 `niro/frontend/node_modules/next/dist/docs/01-app/01-getting-started/`.
@@ -86,17 +88,19 @@ When in doubt, read the local Next.js docs:
 ## AI provider — operational reality
 
 - Calls go through the `openai` Python SDK pointed at the Azure base URL
-  (see `niro/probe.py` for the exact pattern, port to `backend/ai/azure.py` in Phase B).
+  (see `niro/probe.py` for the exact pattern, ported into `niro/backend/ai/azure.py`).
 - Vision works via `image_url` content blocks with `data:` URIs (base64).
 - `response_format={"type":"json_object"}` for structured output.
 - Function/tool calling works.
-- Bangla output is genuinely good — uses Bangla numerals (২৪৫) natively.
+- Bangla output uses Bangla numerals (২৪৫) natively — high quality.
 - Content moderation does **not** flag medical content on this deployment (probed and confirmed).
-- Latency: ~1.5s for small calls, ~3-5s for vision + structured output.
+- Latency: ~1.5s for small calls; **8–24s for vision + structured + history-aware output** (acceptable for demo).
+- **Confidence threshold 0.5** — analyses below this set `recommend_human_review=True` in the UI.
+- **Banned-phrase linter** (`backend/ai/policy.py`) catches imperative dosing language in Bangla + English. Raises `AIPolicyViolation` → audited.
 
 If `gpt-chat-latest` ever fails: swap `AI_PROVIDER=claude` or `gemini`
-in `.env`. The provider abstraction at `backend/ai/provider.py` (Phase B)
-keeps feature code unaware of which provider is active.
+in `.env`. The factory `backend.ai.provider.get_provider()` is the
+single switch point.
 
 ---
 
@@ -104,65 +108,97 @@ keeps feature code unaware of which provider is active.
 
 ```
 .
-├── PROJECT.md                    # product spec
-├── DESIGN.md                     # system design dossier
-├── DESIGN_PROMPT.md              # design brief that produced DESIGN.md
+├── PROJECT.md                    # product spec (canonical, don't rewrite)
+├── DESIGN.md                     # system design dossier (canonical)
+├── DESIGN_PROMPT.md              # design brief
 ├── CLAUDE.md                     # this file
+├── AGENTS.md                     # generic-agent guidance (Claude/Codex)
 ├── .gitignore
-├── .env.example
+├── .env.example                  # committed template
 ├── .env                          # gitignored, holds Azure key
-├── docker-compose.yml            # Postgres + future pgvector
-├── docs/                         # 29 build-time engineering docs
-│   ├── README.md
-│   ├── dev-setup.md              # how to bring up the whole stack
-│   ├── env-vars.md
-│   ├── decisions.md              # D-001..D-008 (live, append new)
-│   ├── open-questions.md
-│   ├── mocks.md                  # Phase-1 safe mocks
-│   ├── glossary.md
-│   ├── build-log.md              # daily diary, append-only
-│   ├── architecture/             # stubs pointing into DESIGN.md
-│   ├── ai-safety/                # audit-logging.md is full; others stubs
-│   ├── frontend/
-│   ├── deployment/
-│   ├── demo/                     # video-script, live-script, risk-register, pitch
-│   └── adr/0001-template.md
+├── docker-compose.yml            # Postgres (alpine)
+├── docs/                         # 29+ engineering docs
 ├── .claude/
-│   └── skills/niro/SKILL.md      # Niro project skill
+│   ├── skills/niro/SKILL.md      # Niro project skill
+│   └── settings.local.json       # gitignored
 └── niro/
-    ├── .venv/                    # Python venv (uv-managed, gitignored)
-    ├── alembic.ini               # Alembic config — sqlalchemy.url is set from backend.config
-    ├── probe.py                  # AI capability probe — 6/6 passing
-    ├── sample_rx.png             # synthetic prescription (Phase A test fixture)
-    ├── sample_lab.png            # synthetic lab report
+    ├── .venv/                    # uv venv, gitignored
+    ├── alembic.ini
+    ├── probe.py                  # AI capability probe (6/6 passing)
+    ├── sample_rx.png, sample_lab.png
     ├── backend/                  # FastAPI service
     │   ├── pyproject.toml
-    │   ├── main.py               # app + /api/v1/health
-    │   ├── config.py             # pydantic-settings, reads .env
+    │   ├── main.py               # app, structlog, CORS, all 29 routes wired
+    │   ├── config.py             # pydantic-settings, reads ../.env
     │   ├── db/
-    │   │   ├── base.py           # DeclarativeBase
-    │   │   ├── session.py        # engine + SessionLocal + get_db dep
-    │   │   ├── models.py         # 5 tables for Phase A
-    │   │   └── migrations/       # Alembic env.py + versions/
-    │   ├── api/routers/          # empty (Phase B onward)
-    │   ├── ai/                   # empty (Phase B)
-    │   ├── services/             # empty (Phase B)
-    │   └── tests/                # empty
+    │   │   ├── base.py
+    │   │   ├── session.py        # sync engine + SessionLocal + get_db
+    │   │   ├── models.py         # 11 tables
+    │   │   └── migrations/       # 0001_init, 0002_phase_b, 0003_phase_c
+    │   ├── ai/
+    │   │   ├── provider.py       # AIProvider ABC + factory
+    │   │   ├── azure.py          # AzureOpenAIProvider concrete impl
+    │   │   ├── prompts.py        # versioned Bangla prompts (rx, lab, history, case)
+    │   │   └── policy.py         # banned-phrase linter
+    │   ├── services/
+    │   │   ├── audit.py          # AuditWriter (append-only)
+    │   │   ├── consent.py        # ConsentGuard.require + record_access
+    │   │   ├── storage.py        # local blob writer with sha256
+    │   │   └── auth.py           # JWT, current_user, role-gating deps
+    │   ├── api/routers/
+    │   │   ├── auth.py           # OTP request/verify/refresh/logout
+    │   │   ├── documents.py      # upload, list, get, delete
+    │   │   ├── analyses.py       # AI analyze (history-aware) + list + get
+    │   │   ├── profile.py        # /me, /timeline, /access-log, DELETE /me
+    │   │   ├── consent.py        # grant, revoke
+    │   │   ├── verifications.py  # request, mock-pay, list, get
+    │   │   ├── doctor.py         # inbox, case view (consent-gated), submit review
+    │   │   ├── doctors.py        # public directory + reviews
+    │   │   └── chamber.py        # session lifecycle: open, scan, profile, prescription, close
+    │   ├── seeds/doctors.py      # 6 BMDC-verified seed
+    │   └── tests/                # empty (Phase F2 fills in golden tests)
     └── frontend/                 # Next.js 16 PWA
-        ├── package.json
-        ├── next.config.ts        # allowedDevOrigins: ["127.0.0.1"]
-        ├── tsconfig.json
-        ├── postcss.config.mjs
-        ├── AGENTS.md             # Next.js's own warning — DON'T DELETE
-        ├── CLAUDE.md             # references AGENTS.md
+        ├── package.json          # next 16, react 19, tailwind 4, qrcode.react, html5-qrcode
+        ├── next.config.ts        # allowedDevOrigins
+        ├── AGENTS.md, CLAUDE.md  # Next.js's own warnings — DON'T DELETE
         └── src/
             ├── app/
-            │   ├── layout.tsx     # Noto Sans Bengali + lang="bn" + <DisclaimerBanner/>
-            │   ├── globals.css    # Tailwind 4 @theme + Bangla OpenType features
-            │   └── page.tsx       # Niro landing page
-            └── components/
-                └── DisclaimerBanner.tsx
+            │   ├── layout.tsx, globals.css (print stylesheet), page.tsx
+            │   ├── signin/, verify/
+            │   ├── home/, upload/, timeline/, access-log/
+            │   ├── analyses/[id]/ (with 🖨 PDF via window.print)
+            │   ├── doctors/, doctors/[id]/
+            │   ├── verifications/, verifications/[id]/ (auto-poll)
+            │   ├── chamber/scan/, chamber/[token]/
+            │   └── doctor-portal/
+            │       ├── inbox/
+            │       ├── cases/[id]/
+            │       └── chamber/    # QR + 2s polling state machine
+            ├── components/
+            │   └── DisclaimerBanner.tsx
+            └── lib/
+                ├── api.ts          # typed fetch wrapper + all response types
+                └── i18n.ts         # toBangla, timeAgoBn
 ```
+
+---
+
+## Locked decisions (full table)
+
+| ID | Decision | Where it shows up |
+|---|---|---|
+| **D-001** | Submit to ICADHI Track 1 (Telemedicine) | ICADHI portal, all demo docs |
+| **D-002** | Keep DESIGN.md intact, add docs/ folder alongside | This file structure |
+| **D-003** | FastAPI + Next.js 15 (now 16) + Postgres + pgvector | All code |
+| **D-004** | Azure OpenAI `gpt-chat-latest` as primary | `.env`, `backend/ai/azure.py` |
+| **D-005** | Project name = Niro | Everywhere |
+| **D-006** | Phase A docs-skeleton-first | Done |
+| **D-007** | Use `postgres:16.3-alpine3.20` for Phase A; pgvector deferred | `docker-compose.yml` |
+| **D-008** | Sync SQLAlchemy 2.0 (not async) | `backend/db/session.py` |
+| **D-009** | OTP storage: `sha256(salt:code)` (not bcrypt) — passlib + bcrypt 5.x incompat | `backend/api/routers/auth.py` |
+| **D-010** | PDF "export" via browser print stylesheet (not WeasyPrint) | `globals.css`, `analyses/[id]/page.tsx` |
+
+See `docs/decisions.md` for rationale + alternatives on each.
 
 ---
 
@@ -176,21 +212,22 @@ keeps feature code unaware of which provider is active.
 
 ### AI safety
 - AI never gives final medical advice — only extracts, explains, flags.
-- Every AI output carries a visible disclaimer in the UI (we have `DisclaimerBanner`).
-- Every AI call logged via `AuditWriter` (Phase B). Audit row has: model+version, prompt SHA256, output SHA256, confidence, timestamp, patient_id (FK).
-- If confidence < threshold, auto-suggest human verification.
-- Banned-phrase linter (Phase B) catches imperative dosing language.
+- Every AI output carries a visible disclaimer (`DisclaimerBanner` global).
+- Every AI call logged via `services.audit.record()` with: model+version, prompt SHA256, output SHA256, confidence, timestamp.
+- `recommend_human_review` flag surfaces in UI when confidence < 0.5.
+- `policy.assert_compliant()` runs on every AI return; violation → audit + 422.
 
 ### Consent and privacy
-- Doctor never sees patient data without explicit, time-bound consent (Phase B+).
-- Default consent expiry: 24 hours.
-- Every doctor view logged, visible to patient.
-- Patient can delete all their data (DPA 2023).
+- Doctor never sees patient data without explicit, time-bound consent.
+- Default consent expiry: 24h (verification flow) / 2h (chamber flow).
+- Every doctor view logged via `consent.record_access()` → both `access_logs` (patient-visible) and `audit_log` (forensic).
+- Patient can delete all their data via `DELETE /api/v1/me` (DPA 2023 compliant).
 
 ### Bangla-first
-- Default UI language is Bangla. English is a toggle.
-- Use Bangla numerals (২৪৫) for medical values when natural.
+- Default UI language is Bangla. English is a toggle (Phase F).
+- Use Bangla numerals (২৪৫) via `lib/i18n.ts toBangla()`.
 - Body font: Noto Sans Bengali via `next/font/google`.
+- OpenType ligature features set in `globals.css`.
 
 ---
 
@@ -200,36 +237,45 @@ keeps feature code unaware of which provider is active.
 # Start Postgres
 docker compose up -d postgres
 
-# Backend
+# Backend (terminal 1)
 cd niro
 source .venv/bin/activate
-alembic -c alembic.ini upgrade head      # apply migrations
+alembic -c alembic.ini upgrade head    # current head: 28e9c4a069e8
+python -m backend.seeds.doctors        # idempotent; seeds 6 doctors
 uvicorn backend.main:app --reload --port 8000
 
-# Verify backend
-curl http://localhost:8000/api/v1/health   # → {"ok":true,...}
-
-# Frontend (separate terminal)
+# Frontend (terminal 2)
 cd niro/frontend
-npm run dev
+npm run dev                            # http://localhost:3000
 
-# Verify frontend
-# Open http://localhost:3000 — Bangla landing page with disclaimer.
+# Verify backend
+curl http://localhost:8000/api/v1/health        # → {"ok":true,...}
 
-# AI probe (any time — sanity check the AI provider is alive)
+# AI probe (any time)
 cd niro
-.venv/bin/python probe.py     # → 6/6 tests passed
+set -a && source ../.env && set +a
+.venv/bin/python probe.py              # → 6/6 tests passed
+
+# Frontend type-check
+cd niro/frontend && npx tsc --noEmit   # → exit 0
+
+# Open psql
+docker compose exec postgres psql -U niro -d niro
+
+# See audit log activity
+docker compose exec -T postgres psql -U niro -d niro \
+  -c "SELECT event, count(*) FROM audit_log GROUP BY event ORDER BY count(*) DESC;"
 ```
 
 ---
 
 ## Conventions
 
-- Python: ruff + black defaults; type hints on public functions. `ruff check niro/backend` before commit.
-- TypeScript: strict mode on. Prefer server components in Next.js; mark client with `"use client"` only when needed.
+- Python: ruff + black defaults; type hints on public functions.
+- TypeScript: strict mode on. Default to server components; mark client with `"use client"` only when needed.
 - Commits: imperative mood with scope prefix (`backend:`, `frontend:`, `ai:`, `docs:`, `phase-<x>:`).
-- One concern per PR. Phase deadlines are tight — small, reviewable diffs win.
-- Update `docs/build-log.md` at the end of every coding session.
+- One concern per PR. Each phase is squashed-merged.
+- Update `docs/build-log.md` at the end of every session.
 
 ---
 
@@ -237,11 +283,14 @@ cd niro
 
 - Don't introduce a new AI provider client outside `backend/ai/`. Extend `AIProvider`.
 - Don't log raw patient documents at INFO/WARN. Hashes + IDs only.
-- Don't add features outside the current phase scope. Check `docs/decisions.md` D-006.
+- Don't add features outside the current phase scope without updating `docs/decisions.md`.
 - Don't write defensive fallbacks for impossible scenarios. Trust the schema.
 - Don't write multi-paragraph docstrings or comment blocks. One line max.
-- Don't use Next.js 14/15 patterns (sync `params`, `next lint`, `middleware.ts`). See gotchas above.
-- Don't use `tailwind.config.ts` — Tailwind 4 uses `@theme inline` in CSS.
+- Don't use Next.js 14/15 patterns (sync `params`, `next lint`, `middleware.ts`).
+- Don't use `tailwind.config.ts` — Tailwind 4 uses `@theme inline`.
+- Don't reach for bcrypt for short-lived secrets (D-009).
+- Don't try to use `images.domains` (deprecated in Next 16).
+- Don't pull `pgvector/pgvector:pg16` blindly — Docker Hub IPv6 is broken on this network (D-007).
 
 ---
 
@@ -250,5 +299,7 @@ cd niro
 - Product question → read `PROJECT.md`.
 - Architecture question → read `DESIGN.md §<N>`.
 - "Will the model handle X?" → re-run `niro/probe.py` with a test case.
-- Scope creep temptation → re-read `DESIGN.md §12` (decisions locked) and `docs/decisions.md` (live).
+- Scope creep temptation → re-read `docs/decisions.md`.
 - "How was X last done?" → grep `docs/build-log.md`.
+- "What routes exist?" → see `docs/architecture/api-surface.md` or run `python -c "from backend.main import app; ..."`.
+- AI returning 401 → check `.env` `AZURE_OPENAI_KEY` for trailing whitespace/typos. See `docs/build-log.md` Day 2 for the diagnostic curl.

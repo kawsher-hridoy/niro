@@ -318,40 +318,57 @@ The judges grade the demo, not your microservices.
 
 ## 12. Decisions Already Made (so we don't relitigate)
 
-- **Name:** Niro.
-- **Track:** Track 1 — AI-Driven Telemedicine & Remote Healthcare.
-- **Phase-1 demo scope:** locked above. No new features added before 27 May.
-- **Language:** Bangla-first, English secondary.
-- **Hybrid online + offline chamber** is core, not optional.
-- **AI never gives final medical advice** — only explains and flags.
-- **Reviews are verified-consult-only.**
+> **Status as of 23 May 2026:** Phases A–D merged. Phase 1 build feature-complete.
+> See [`docs/decisions.md`](docs/decisions.md) for the live D-001..D-010 table with
+> rationale + alternatives per decision.
+
+- **Name:** Niro. ✅
+- **Track:** Track 1 — AI-Driven Telemedicine & Remote Healthcare. ✅
+- **Phase-1 demo scope:** Phase A–D shipped. **Code-freeze after 27 May submission.**
+- **Language:** Bangla-first, English toggle deferred to Phase F.
+- **Hybrid online + offline chamber** is core, not optional. ✅ Built in Phase D.
+- **AI never gives final medical advice** — only explains and flags. Enforced by `backend/ai/policy.py` post-call linter.
+- **Reviews are verified-consult-only.** Enforced by `backend/api/routers/doctors.py`.
 - **AI provider:** Azure OpenAI `gpt-chat-latest`, wrapped behind `AIProvider`
   abstraction so a swap to Claude/Gemini is one env var.
+- **Tech stack locked (D-003):** FastAPI + Next.js 16 + Postgres + Tailwind 4 + React 19.
+- **Sync SQLAlchemy 2.0 (D-008)** — not async.
+- **OTP storage via `sha256(salt:code)` (D-009)** — not bcrypt.
+- **PDF "export" via browser print (D-010)** — not WeasyPrint.
+- **Phase A used `postgres:16.3-alpine3.20` (D-007)** — pgvector deferred to Phase F when RAG lands.
 
 ---
 
-## 13. Open Questions (decide before Sunday)
+## 13. Open Questions
 
-1. ~~Project final name~~ — **Decided: Niro.**
-2. Team composition — who, what skills, who's the team leader for registration.
-3. Bangla TTS for voice replay — needed in Phase 1, or Phase 2?
-4. ~~Which LLM provider~~ — **Decided: Azure OpenAI `gpt-chat-latest`** (probed and passes).
-5. Mobile-first demo, or web-first demo for the video? (Recommendation: web,
-   easier to film and screen-record.)
+> Live status: see [`docs/open-questions.md`](docs/open-questions.md).
+
+Resolved:
+- ~~Project final name~~ → **Niro** (D-005)
+- ~~Which LLM provider~~ → **Azure `gpt-chat-latest`** (D-004)
+- ~~Team composition~~ → **Solo build** (kawsher-hridoy)
+- ~~Doc strategy~~ → Keep DESIGN.md intact + docs/ (D-002)
+
+Still open (post-Phase-D):
+- MBBS contact for the live demo on 15 June (if shortlisted)
+- Production domain name (Phase F4)
+- Real BMDC API integration (Phase F2)
+- Real SMS provider (Phase F)
+- Production AI subscription migration off the shared account
 
 ---
 
 ## 14. Immediate Next Steps
 
-1. **Today (23 May):** Register the team at
-   https://icadhi.daffodilvarsity.site/registration/project-showcase
-   (Phase-1 fee: Tk 300, deadline today.)
-2. **Tomorrow (24 May):** Lock team + name + LLM choice. Set up project repo.
-3. **24–26 May:** Build the Phase-1 demo per §9 scope.
-4. **27 May:** Record and submit the video.
-5. **27 May – 30 May:** Wait for selection-phase result (top 30 announced 30 May).
-6. **30 May – 15 June (if shortlisted):** Build Phase-2 polish per §9 scope.
+> ✅ Phases A–D shipped on 23 May 2026. **Code-freeze in effect.**
+
+1. ~~Register the team on ICADHI portal~~ ✅ Done.
+2. ~~Build the Phase-1 demo~~ ✅ Done across PRs #1-#4.
+3. **27 May — record + submit the video.** See [`docs/demo/video-script.md`](docs/demo/video-script.md) for the 90-second shot list. Submit at https://icadhi.daffodilvarsity.site/.
+4. **27 May – 30 May:** Wait for selection-phase result (top 30 announced 30 May).
+5. **30 May – 14 June (if shortlisted):** Phase F polish — see [`docs/build-log.md`](docs/build-log.md) for backlog and [`docs/open-questions.md`](docs/open-questions.md) for remaining decisions.
+6. **15 June:** Live demo — see [`docs/demo/live-script.md`](docs/demo/live-script.md) + [`docs/demo/risk-register.md`](docs/demo/risk-register.md).
 
 ---
 
-*Document version: draft 1 — 23 May 2026.*
+*Document version: 2.0 — 23 May 2026 (post Phase D merge).*
