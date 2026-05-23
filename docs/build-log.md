@@ -240,6 +240,21 @@ the diff (commit hash or branch). Keep it under 200 words per day.
 
 ---
 
+## Day 5 — 23 May 2026 (issue fixes)
+
+Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved issue.
+
+### Fix #1 — Landing page rebuild as a full marketing site
+
+- **Problem:** `/` looked unprofessional — sparse hero, ICADHI/version footer leaking into UI, redundant English subtitles on every Bangla card, hand-rolled `DisclaimerBanner` banner on every page, flat black background.
+- **Root cause:** The landing was a minimal Phase-A placeholder, never revisited. Theme tokens were primitive (`--background`, `--accent`) with a forced `prefers-color-scheme: dark` override.
+- **Change:** Deleted `DisclaimerBanner`. Rewrote `app/page.tsx` as a server-rendered marketing landing with 6 sections — sticky nav, hero with CSS-drawn iPhone mockup (fake AI-analysis screen), trust strip, feature cards with inline SVG icons, 3-step how-it-works, final CTA band, minimal footer. New theme palette in `@theme inline`: warm off-white background, deep medical green primary, soft-accent tint for backdrops. `--color-accent` aliased to the new primary so the rest of the app keeps its existing utility classes working without touching other pages.
+- **Files:** `niro/frontend/src/app/page.tsx`, `niro/frontend/src/app/layout.tsx`, `niro/frontend/src/app/globals.css`, `niro/frontend/src/components/DisclaimerBanner.tsx` (deleted).
+- **Verified by:** All 4 acceptance greps return zero matches (DisclaimerBanner, ICADHI/Track 1/v0.1.0/Get started/About, English card subtitles). `npx tsc --noEmit` exits 0. User confirmed in browser.
+- **Commit:** `caaa8f9`.
+
+---
+
 ## Template for new entries
 
 ```markdown
