@@ -259,3 +259,39 @@ export type CaseView = {
   }>;
   consent_id: string;
 };
+
+export type ChamberSessionOut = {
+  id: string;
+  qr_token: string;
+  qr_payload: string;
+  doctor_name: string;
+  chamber_address: string | null;
+  opened_at: string;
+  expires_at: string;
+  bound_at: string | null;
+  closed_at: string | null;
+  consent_id: string | null;
+  patient_id: string | null;
+  patient_name: string | null;
+};
+
+export type ChamberProfileOut = {
+  session: ChamberSessionOut;
+  patient_name: string;
+  timeline: Array<{
+    kind: "document" | "analysis";
+    id: string;
+    doc_kind?: string;
+    document_id?: string;
+    occurred_at: string;
+    title_bn: string;
+    preview_bn?: string;
+  }>;
+  latest_analysis: {
+    id: string;
+    structured: AnalysisOut["structured"];
+    explanation_bn: string;
+    red_flags: RedFlag[];
+    confidence: number;
+  } | null;
+};
