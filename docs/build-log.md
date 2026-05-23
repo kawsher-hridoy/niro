@@ -85,6 +85,55 @@ the diff (commit hash or branch). Keep it under 200 words per day.
 
 ---
 
+## Day 2 — 23 May 2026 (late session)
+
+**Phase:** B — AI integration + upload path.
+
+**Shipped (backend):**
+- Migration `a376ab1ca234` — adds `analyses`, `audit_log`, `access_logs`, `consents` tables (PHI-marked, indexed). Applied to local DB.
+- `backend/ai/provider.py` — `AIProvider` ABC + factory `get_provider()`; types for `DocumentAnalysis`, `CaseSummary`, `Medication`, `LabValue`, `RedFlag`.
+- `backend/ai/azure.py` — `AzureOpenAIProvider` concrete implementation. Vision + Bangla + JSON output + history-aware prompt context.
+- `backend/ai/prompts.py` — versioned Bangla system prompts (`rx-bn-v1.0`, `lab-bn-v1.0`, `hist-bn-v1.0`, `case-bn-v1.0`).
+- `backend/ai/policy.py` — banned-phrase linter (raises `AIPolicyViolation` for imperative dosing language; ~10 patterns in Bangla + English).
+- `backend/services/audit.py` — append-only `AuditWriter`.
+- `backend/services/consent.py` — `ConsentGuard` with `require()` + `record_access()`.
+- `backend/services/storage.py` — local blob writer; layout `<patient_id>/<doc_id>.<ext>`; sha256 on write.
+- `backend/services/auth.py` — JWT (HS256) issuer/decoder + bearer extractor + role-gating deps.
+- Routers: `auth.py` (OTP request/verify/refresh/logout; SHA-256-with-salt OTP storage), `documents.py` (upload, list, get, delete; 10MB cap), `analyses.py` (analyze with history, get, list, with `recommend_human_review` if confidence < 0.5).
+- All 11 new routes registered in `backend/main.py`.
+
+**Shipped (frontend):**
+- `src/lib/api.ts` — typed `apiGet`/`apiPost`/`apiUpload`, session helpers, full type defs.
+- `src/lib/i18n.ts` — `toBangla` (Bangla numerals), `timeAgoBn`.
+- `src/app/signin/page.tsx` — phone entry, kicks off OTP flow.
+- `src/app/verify/page.tsx` — 6-digit OTP entry + optional name; saves session to localStorage.
+- `src/app/home/page.tsx` — patient dashboard with upload CTA + list of past documents.
+- `src/app/upload/page.tsx` — file picker + kind selector → upload → analyze chain. Supports `?document=<id>` for re-analyze.
+- `src/app/analyses/[id]/page.tsx` — full result view: Bangla explanation, red-flag chips, confidence badge, medications table, lab values table, doctor questions list. Handles Next.js 16 async `params`.
+
+**Verified:**
+- 12 endpoints registered cleanly under `/api/v1`.
+- OTP → verify → JWT works end-to-end. Tested with `+8801711000001` → got valid 232-char access token.
+- Upload `sample_rx.png` succeeds; blob written; `documents` row inserted; 3 audit rows logged (`auth.otp.requested`, `auth.login`, `document.upload`).
+- Frontend `npx tsc --noEmit` exits 0.
+
+**Didn't ship (deferred):**
+- Live AI analysis verification — **AI key in `.env` is returning 401 from Azure** (see Blockers). Code is in place; live call is blocked.
+
+**Issues encountered:**
+- **passlib + bcrypt 5.x incompat.** New bcrypt removed `__about__`; passlib's bcrypt init detects this as a fatal config error. Switched OTP storage from `passlib.bcrypt.hash` to `sha256(salt:code)` with `secrets.compare_digest`. Salt + hash stored as `salt$hex` in `otp_codes.code_hash`.
+- **Bearer-token strip exploded on empty tokens.** Replaced naive `header.split()[1]` with a strict 2-part parse.
+- **Azure 401 with the key the user pasted.** The earlier probe this session (6/6 PASS) used the same key value; now both probe and a direct HTTP call return 401. Endpoint reachable; key rejected. Logged as **OQ-13** for user to verify in Azure portal.
+
+**Blockers (carryover):**
+- 🚨 **Azure key rejected (OQ-13).** User to verify Key 1 / Key 2 in Azure portal and paste the working one into `.env`. After that, re-run `niro/probe.py` to confirm; AI analysis will work immediately (no code change needed).
+
+**Smoke test status:** 5/6 pass — auth + upload + DB + audit + frontend all good. AI analyze blocked by key.
+
+**Commit:** branch `phase-b/ai-upload`, hash TBD after this entry.
+
+---
+
 ## Template for new entries
 
 ```markdown
