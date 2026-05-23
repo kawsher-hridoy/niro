@@ -1,0 +1,189 @@
+"""Azure OpenAI concrete implementation of AIProvider.
+
+Patterns ported from niro/probe.py (which is the source of truth for what
+works against the gpt-chat-latest deployment). When the probe passes, the
+provider should pass too.
+"""
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import time
+from typing import Any
+
+from openai import OpenAI
+
+from backend.ai import prompts
+from backend.ai.policy import assert_compliant
+from backend.ai.provider import (
+    AIProvider,
+    CaseSummary,
+    DocKind,
+    DocumentAnalysis,
+)
+from backend.config import get_settings
+
+
+_HISTORY_LIMIT = 3
+_MODEL_VERSION = "2026-05-05"  # gpt-chat-latest from probe; updated when deployment changes
+
+
+def _sha256(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+def _b64(image: bytes) -> str:
+    return base64.b64encode(image).decode("ascii")
+
+
+def _history_block(history: list[DocumentAnalysis]) -> str:
+    if not history:
+        return ""
+    lines: list[str] = [prompts.HISTORY_INTRO_BN]
+    for i, h in enumerate(history[-_HISTORY_LIMIT:], 1):
+        meds = h.get("structured", {}).get("medications", []) or []
+        med_names = ", ".join(m.get("name", "?") for m in meds[:6])
+        lines.append(
+            f"  {i}. ({h.get('model_name', '?')}) ওষুধ: {med_names or '—'}; "
+            f"সারসংক্ষেপ: {(h.get('explanation_bn') or '')[:160]}"
+        )
+    return "\n".join(lines)
+
+
+class AzureOpenAIProvider(AIProvider):
+    """OpenAI SDK pointed at the Azure base URL."""
+
+    def __init__(self) -> None:
+        s = get_settings()
+        self._client = OpenAI(base_url=s.azure_openai_endpoint, api_key=s.azure_openai_key)
+        self._deployment = s.azure_openai_deployment
+        self._model_version = _MODEL_VERSION
+
+    # ---------- analyze ----------
+
+    def analyze_document(
+        self,
+        image_or_pdf_bytes: bytes,
+        mime: str,
+        hint_kind: DocKind | None = None,
+        history: list[DocumentAnalysis] | None = None,
+    ) -> DocumentAnalysis:
+        kind = hint_kind or "prescription"
+        if kind == "lab_report":
+            system_prompt = prompts.LAB_REPORT_PROMPT_BN
+            prompt_version = prompts.LAB_REPORT_PROMPT_VERSION
+        else:
+            system_prompt = prompts.PRESCRIPTION_PROMPT_BN
+            prompt_version = prompts.PRESCRIPTION_PROMPT_VERSION
+
+        if history:
+            system_prompt = system_prompt + "\n\n" + _history_block(history)
+            prompt_version = f"{prompt_version}+{prompts.HISTORY_PROMPT_VERSION}"
+
+        img_data_uri = f"data:{mime or 'image/png'};base64,{_b64(image_or_pdf_bytes)}"
+        user_text = "এই ডকুমেন্টটি বিশ্লেষণ করো এবং JSON ফেরত দাও।"
+
+        t0 = time.time()
+        resp = self._client.chat.completions.create(
+            model=self._deployment,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_text},
+                        {"type": "image_url", "image_url": {"url": img_data_uri}},
+                    ],
+                },
+            ],
+            response_format={"type": "json_object"},
+            timeout=60,
+        )
+        latency_ms = int((time.time() - t0) * 1000)
+
+        raw = resp.choices[0].message.content or "{}"
+        try:
+            data: dict[str, Any] = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"AI returned non-JSON: {e}") from e
+
+        meta = data.get("_meta") or {}
+        confidence = float(meta.get("confidence", 0.7))
+
+        analysis: DocumentAnalysis = {
+            "kind": kind,
+            "structured": data.get("structured", {}) or data,  # some models inline-flatten
+            "explanation_bn": data.get("explanation_bn", "") or "",
+            "red_flags": data.get("red_flags", []) or [],
+            "questions_bn": data.get("questions_bn", []) or [],
+            "confidence": confidence,
+            "model_name": self._deployment,
+            "model_version": self._model_version,
+            "prompt_sha256": _sha256(system_prompt),
+            "output_sha256": _sha256(raw),
+            "latency_ms": latency_ms,
+        }
+
+        # Cleanup: some models include _meta or duplicate keys inside structured;
+        # peel out medications if they slipped to top-level.
+        if "medications" in data and not analysis["structured"].get("medications"):
+            analysis["structured"]["medications"] = data["medications"]
+
+        # Hard rule check.
+        assert_compliant(analysis)
+        # detail field used by audit logger; not part of the wire shape.
+        analysis["_prompt_version"] = prompt_version  # type: ignore[typeddict-item]
+
+        return analysis
+
+    # ---------- case summary ----------
+
+    def prepare_case_summary(
+        self,
+        target_analysis: DocumentAnalysis,
+        history: list[DocumentAnalysis],
+    ) -> CaseSummary:
+        history_text = _history_block(history)
+        target_brief = {
+            "kind": target_analysis.get("kind"),
+            "structured": target_analysis.get("structured"),
+            "explanation_bn": target_analysis.get("explanation_bn"),
+            "red_flags": target_analysis.get("red_flags"),
+        }
+        user_text = (
+            "টার্গেট analysis (সবচেয়ে সাম্প্রতিক):\n"
+            + json.dumps(target_brief, ensure_ascii=False, indent=2)
+            + "\n\n"
+            + history_text
+        )
+
+        t0 = time.time()
+        resp = self._client.chat.completions.create(
+            model=self._deployment,
+            messages=[
+                {"role": "system", "content": prompts.CASE_SUMMARY_PROMPT_BN},
+                {"role": "user", "content": user_text},
+            ],
+            response_format={"type": "json_object"},
+            timeout=60,
+        )
+        latency_ms = int((time.time() - t0) * 1000)
+
+        raw = resp.choices[0].message.content or "{}"
+        data: dict[str, Any] = json.loads(raw)
+
+        summary: CaseSummary = {
+            "patient_summary_bn": data.get("patient_summary_bn", "") or "",
+            "current_medications": data.get("current_medications", []) or [],
+            "ai_concerns": data.get("ai_concerns", []) or [],
+            "questions_for_doctor": data.get("questions_for_doctor", []) or [],
+            "referenced_history": data.get("referenced_history", []) or [],
+            "model_name": self._deployment,
+            "model_version": self._model_version,
+            "prompt_sha256": _sha256(prompts.CASE_SUMMARY_PROMPT_BN),
+            "output_sha256": _sha256(raw),
+        }
+        summary["_latency_ms"] = latency_ms  # type: ignore[typeddict-item]
+        assert_compliant(summary)
+        return summary

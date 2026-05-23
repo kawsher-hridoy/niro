@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.api.routers import analyses, documents
+from backend.api.routers import auth as auth_router
 from backend.config import get_settings
 from backend.db.session import get_db
 
@@ -68,3 +70,6 @@ def health(db: Session = Depends(get_db)) -> dict:
 
 
 app.include_router(api)
+app.include_router(auth_router.router, prefix="/api/v1")
+app.include_router(documents.router, prefix="/api/v1")
+app.include_router(analyses.router, prefix="/api/v1")
