@@ -22,6 +22,39 @@ export class ApiError extends Error {
   }
 }
 
+export type AuthErrorBody = {
+  detail: string;
+  fields?: Record<string, string>;
+};
+
+export function parseAuthError(e: unknown): AuthErrorBody {
+  if (e instanceof ApiError) {
+    const b = e.body;
+    if (b && typeof b === "object") {
+      const obj = b as { detail?: unknown; fields?: unknown };
+      // FastAPI sometimes wraps non-string detail as the whole error body
+      const inner =
+        obj.detail && typeof obj.detail === "object"
+          ? (obj.detail as { detail?: unknown; fields?: unknown })
+          : null;
+      const detail =
+        (inner && typeof inner.detail === "string" && inner.detail) ||
+        (typeof obj.detail === "string" && obj.detail) ||
+        `HTTP ${e.status}`;
+      const fields =
+        (inner && inner.fields && typeof inner.fields === "object"
+          ? (inner.fields as Record<string, string>)
+          : undefined) ??
+        (obj.fields && typeof obj.fields === "object"
+          ? (obj.fields as Record<string, string>)
+          : undefined);
+      return { detail, fields };
+    }
+    return { detail: String(b) };
+  }
+  return { detail: String(e) };
+}
+
 export type Session = {
   access: string;
   refresh: string;
@@ -110,6 +143,58 @@ export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
   const r = await _send(path, { method: "POST", body: form });
   return (await r.json()) as T;
 }
+
+// ---------- auth API ----------
+
+export type SignupStartIn = {
+  full_name: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirm_password: string;
+};
+export type SignupStartOut = {
+  signup_token: string;
+  expires_at: string;
+  otp?: string | null;
+};
+export type SignupVerifyIn = { signup_token: string; code: string };
+export type SignupResendOut = {
+  expires_at: string;
+  resend_count: number;
+  otp?: string | null;
+};
+export type PasswordLoginIn = { identifier: string; password: string };
+export type ResetStartOut = {
+  reset_token: string;
+  expires_at: string;
+  otp?: string | null;
+};
+export type ResetConfirmIn = { phone: string; code: string; new_password: string };
+export type OtpRequestOut = { ok: boolean; dev_hint?: string | null };
+
+export const authApi = {
+  signupStart: (body: SignupStartIn) =>
+    apiPost<SignupStartOut>("/auth/signup/start", body, { auth: false }),
+  signupVerify: (body: SignupVerifyIn) =>
+    apiPost<Session>("/auth/signup/verify", body, { auth: false }),
+  signupResendOtp: (signup_token: string) =>
+    apiPost<SignupResendOut>("/auth/signup/resend-otp", { signup_token }, { auth: false }),
+  loginPassword: (body: PasswordLoginIn) =>
+    apiPost<Session>("/auth/login/password", body, { auth: false }),
+  loginOtpRequest: (phone: string) =>
+    apiPost<OtpRequestOut>("/auth/login/otp/request", { phone }, { auth: false }),
+  loginOtpVerify: (phone: string, code: string, full_name?: string) =>
+    apiPost<Session>(
+      "/auth/login/otp/verify",
+      { phone, code, full_name: full_name || undefined },
+      { auth: false }
+    ),
+  resetStart: (phone: string) =>
+    apiPost<ResetStartOut>("/auth/password/reset/start", { phone }, { auth: false }),
+  resetConfirm: (body: ResetConfirmIn) =>
+    apiPost<Session>("/auth/password/reset/confirm", body, { auth: false }),
+};
 
 // ---------- typed responses ----------
 

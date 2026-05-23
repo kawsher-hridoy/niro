@@ -125,6 +125,7 @@ def run() -> None:
                 phone=d["phone"],
                 full_name=d["full_name"],
                 language="bn",
+                phone_verified_at=datetime.now(timezone.utc),
                 last_login_at=datetime.now(timezone.utc),
             )
             db.add(user)

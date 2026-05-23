@@ -15,6 +15,17 @@ Format per decision:
 
 ---
 
+## D-012 — Password hashing via argon2-cffi (not bcrypt, not passlib)
+
+- **What:** User passwords (introduced in Fix #2 — sign-up + password login + reset) are hashed with `argon2-cffi` (`PasswordHasher.hash()` / `.verify()`). Stored in `users.password_hash` (Argon2id, default params: t=3, m=64 MiB, p=4). OTP codes still use `sha256(salt:code)` per D-009.
+- **When:** 23 May 2026 (Fix #2)
+- **Owner:** kawsher-hridoy
+- **Why:** OWASP recommends Argon2id for new password storage; it has no maintenance issues. `passlib + bcrypt 5.x` is broken on init (D-009) and we already eliminated `passlib` from the OTP path. Adding `passlib` back just for passwords would resurrect the same compat trap. `argon2-cffi` is a pure direct dep, no `passlib` shim layer, no `__about__` introspection bug.
+- **Alternatives considered:** Pin `bcrypt<4.0` + `passlib` (rejected — `passlib` is unmaintained since 2020 and we'd carry a deprecated dep into prod). `bcrypt` directly without `passlib` (rejected — Argon2 is the modern OWASP recommendation; bcrypt's only advantage was passlib's interop). `scrypt` (rejected — less attacker resistance per unit memory than Argon2id). pbkdf2 (rejected — weakest of the bunch).
+- **Status:** Locked.
+- **Affected files:** `niro/backend/pyproject.toml` (new dep), `niro/backend/services/auth.py` (`hash_password`, `verify_password`), `niro/backend/api/routers/auth.py` (signup + password login + reset flows), `niro/backend/db/migrations/versions/0004_email_password_auth.py` (`users.password_hash` column).
+- **Related:** D-009 (OTPs intentionally still use sha256+salt — different threat model, short-lived 6-digit code).
+
 ## D-011 — Landing `/` is a full marketing site (light-mode only); `DisclaimerBanner` removed
 
 - **What:** `/` is a 6-section marketing landing (sticky nav → hero with CSS phone mockup → trust strip → features → how-it-works → final CTA → footer), with a new healthcare token palette (`--color-primary` deep medical green, warm off-white background) in `globals.css`. Light-mode only — the `prefers-color-scheme: dark` override was removed. The `DisclaimerBanner` component (previously mounted globally in `layout.tsx`) was deleted.

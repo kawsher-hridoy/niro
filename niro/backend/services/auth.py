@@ -1,7 +1,10 @@
-"""JWT auth helpers.
+"""JWT auth helpers + password hashing.
 
 Token format: jose JWT signed HS256 with APP_SECRET.
 Payload: {sub: user_id, role, type: "access"|"refresh", exp}.
+
+Password hashing: argon2-cffi (D-012). OWASP-recommended; no passlib +
+bcrypt 5.x compat issues (D-009).
 
 Phase B uses bearer in Authorization header. Phase 2 may move to
 httpOnly cookies via the Next.js BFF.
@@ -12,6 +15,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal
 
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError, InvalidHashError
 from fastapi import Depends, Header, HTTPException, status
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -24,6 +29,19 @@ from backend.db.session import get_db
 ACCESS_TTL = timedelta(hours=1)
 REFRESH_TTL = timedelta(days=30)
 ALGO = "HS256"
+
+_ph = PasswordHasher()
+
+
+def hash_password(plain: str) -> str:
+    return _ph.hash(plain)
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return _ph.verify(hashed, plain)
+    except (VerifyMismatchError, InvalidHashError):
+        return False
 
 
 def make_token(

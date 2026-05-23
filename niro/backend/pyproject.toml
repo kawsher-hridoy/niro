@@ -24,6 +24,7 @@ dependencies = [
     # Auth / crypto
     "python-jose[cryptography]>=3.3",
     "passlib[bcrypt]>=1.7",
+    "argon2-cffi>=23.1.0",
     # Logging
     "structlog>=24.4",
     # Misc

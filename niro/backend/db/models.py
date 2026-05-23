@@ -37,8 +37,14 @@ class User(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)  # ★
+    email: Mapped[str | None] = mapped_column(String(254), unique=True, nullable=True)  # ★
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     full_name: Mapped[str] = mapped_column(String(128), nullable=False)  # ★
     language: Mapped[str] = mapped_column(String(8), nullable=False, default="bn")
+    phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_login_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -59,8 +65,31 @@ class OtpCode(Base):
 
     phone: Mapped[str] = mapped_column(String(20), primary_key=True)
     code_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(16), nullable=False, default="login")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        CheckConstraint("purpose IN ('login','reset')", name="ck_otp_codes_purpose"),
+    )
+
+
+class PendingSignup(Base):
+    __tablename__ = "pending_signups"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    signup_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), nullable=False, index=True)  # ★
+    email: Mapped[str] = mapped_column(String(254), nullable=False)  # ★
+    full_name: Mapped[str] = mapped_column(String(128), nullable=False)  # ★
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    otp_code_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    resend_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class PatientProfile(Base):
