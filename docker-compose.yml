@@ -1,0 +1,22 @@
+services:
+  postgres:
+    # Phase A uses cached postgres:16.3-alpine (Docker Hub IPv6 unreachable from this network).
+    # Swap to pgvector/pgvector:pg16 in Phase C when RAG over DGDA formulary lands.
+    # See docs/decisions.md D-007.
+    image: postgres:16.3-alpine3.20
+    container_name: niro-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./.data/pg:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: niro
+      POSTGRES_PASSWORD: niro
+      POSTGRES_DB: niro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U niro -d niro"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped

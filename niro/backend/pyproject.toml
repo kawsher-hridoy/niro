@@ -1,0 +1,64 @@
+[project]
+name = "niro-backend"
+version = "0.1.0"
+description = "Niro — patient-owned medical record + AI document analyzer + doctor verification"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "kawsher-hridoy" }]
+
+dependencies = [
+    # Web
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.18",
+    # DB
+    "sqlalchemy>=2.0.36",
+    "alembic>=1.14",
+    "psycopg[binary]>=3.2",
+    # Config / validation
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    # AI
+    "openai>=1.55",
+    "pillow>=11.0",
+    # Auth / crypto
+    "python-jose[cryptography]>=3.3",
+    "passlib[bcrypt]>=1.7",
+    # Logging
+    "structlog>=24.4",
+    # Misc
+    "httpx>=0.28",
+    "qrcode[pil]>=8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["backend*"]
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501"]
