@@ -44,7 +44,15 @@ export default function DoctorInboxPage() {
 
   return (
     <main className="flex-1 flex flex-col px-6 py-10 max-w-3xl mx-auto w-full gap-6">
-      <h1 className="text-2xl font-bold text-accent">ইনবক্স — পর্যালোচনার অপেক্ষায়</h1>
+      <header className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-2xl font-bold text-accent">ইনবক্স — পর্যালোচনার অপেক্ষায়</h1>
+        <Link
+          href="/doctor-portal/chamber"
+          className="text-sm px-3 py-2 rounded-lg bg-accent text-white"
+        >
+          📷 চেম্বার সেশন শুরু
+        </Link>
+      </header>
       {err && <p className="text-sm text-red-700">{err}</p>}
 
       <section>

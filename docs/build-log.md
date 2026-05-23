@@ -180,6 +180,66 @@ the diff (commit hash or branch). Keep it under 200 words per day.
 
 ---
 
+## Day 4 — 23 May 2026 (later)
+
+**Phase:** D — Chamber QR + PDF + polish.
+
+**Shipped (backend):**
+- `routers/chamber.py` — full chamber session flow:
+  - `POST /chamber/session` (doctor opens session, returns QR token + `niro://chamber/<token>` payload)
+  - `POST /chamber/session/{qr_token}/scan` (patient scans, picks scope + duration, server creates Consent and binds session)
+  - `GET /chamber/session/{session_id}` (poll for state — used by both sides)
+  - `GET /chamber/session/{session_id}/profile` (consent-gated: returns patient timeline + latest analysis; writes access_log row + audit event)
+  - `POST /chamber/session/{session_id}/prescription` (doctor uploads new Rx → goes onto patient's profile with `source=doctor_added`)
+  - `POST /chamber/session/{session_id}/close` (either party; revokes the consent on close)
+- 6 new audit events: `chamber.session.opened`, `chamber.session.bound`, `chamber.session.closed`, `doctor.view.timeline`, `doctor.prescription.written`, plus the `consent.granted` for chamber context.
+
+**Shipped (frontend):**
+- Extended `api.ts` with `ChamberSessionOut`, `ChamberProfileOut` types.
+- `/doctor-portal/chamber` — 4-phase state machine:
+  1. **init** — doctor enters chamber address, taps "Create QR"
+  2. **waiting** — QR rendered via `qrcode.react`, polls session every 2s for `bound_at`
+  3. **bound** — loads patient profile, shows latest AI analysis + Bangla red flags + timeline + inline prescription upload form
+  4. **closed** — confirmation, link back to inbox
+- `/chamber/scan` — patient camera-based QR scanner using `html5-qrcode`. Handles `niro://chamber/<token>` URI scheme. Manual-paste fallback if camera unavailable.
+- `/chamber/[token]` — patient consent confirmation page: picks scope (single doc / 3 months / full history) + duration slider (1-24h), POSTs `/chamber/session/{token}/scan`, shows success card with doctor name + expiry.
+- Patient home gets a prominent green "📷 চেম্বার QR স্ক্যান" nav button.
+- Doctor inbox gets a "📷 চেম্বার সেশন শুরু" button in the header.
+
+**PDF export (lightweight):**
+- Added `@media print` stylesheet to `globals.css` — hides nav/buttons/banners, expands content to full width, locks accent color for ink legibility.
+- "🖨 PDF" button on `/analyses/[id]` calls `window.print()`. User picks "Save as PDF" in print dialog. Same result as server-side PDF, no Cairo/WeasyPrint dependency.
+
+**Polish:**
+- Patient home grid + buttons cleaner.
+- Disclaimer banner still always visible.
+- Empty states throughout in Bangla.
+
+**Verified end-to-end:**
+- Doctor opens chamber session at "Popular Diagnostic, Dhanmondi" → QR rendered with `niro://chamber/<token>` payload.
+- Patient (new user "করিম মিয়া") scans (or pastes the token) → consent dialog → approves `full_history` for 2h.
+- Doctor's tablet auto-updates within 2s, loads patient profile (0 prior entries since new patient).
+- Doctor uploads `sample_rx.png` as a new prescription → patient's timeline immediately shows "প্রেসক্রিপশন আপলোড".
+- Doctor closes session → consent revoked, `session.closed_at` set.
+- **Audit log: 15 distinct event types** spanning auth, AI, consent, payment, doctor activity, chamber lifecycle.
+- All 6 Phase D pages load HTTP 200 with Bangla content rendered correctly.
+- Frontend `tsc --noEmit` exits 0.
+
+**Phase 1 build is now feature-complete.**
+
+**Didn't ship (deferred to Phase E or beyond):**
+- Server-side PDF rendering (WeasyPrint / Playwright). Browser print is sufficient.
+- BMDC API live verification (mocked via seeded `verified=true`).
+- Real bKash sandbox (mock M-2).
+- Real SMS (mock M-1).
+- Native mobile apps.
+
+**Smoke test status (full Phase 1):** End-to-end works across patient + doctor + chamber. The 14-step smoke from `docs/dev-setup.md §7` can now run cleanly.
+
+**Commit:** branch `phase-d/chamber-polish`, hash TBD.
+
+---
+
 ## Template for new entries
 
 ```markdown

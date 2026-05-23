@@ -67,7 +67,16 @@ export default function AnalysisDetail({ params }: PageProps) {
         <h1 className="text-2xl font-bold text-accent">
           {kindLabelBn(a.kind)} — AI বিশ্লেষণ
         </h1>
-        <ConfidenceBadge confidence={a.confidence} />
+        <div className="flex items-center gap-2">
+          <ConfidenceBadge confidence={a.confidence} />
+          <button
+            onClick={() => window.print()}
+            className="text-xs px-2.5 py-1.5 rounded-md border border-foreground/15 hover:bg-foreground/5"
+            title="PDF হিসেবে সেভ করতে প্রিন্ট ডায়ালগ থেকে 'Save as PDF' বেছে নিন"
+          >
+            🖨 PDF
+          </button>
+        </div>
       </header>
 
       {a.recommend_human_review && (

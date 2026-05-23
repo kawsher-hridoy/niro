@@ -66,6 +66,12 @@ export default function PatientHome() {
           যাচাই অনুরোধ
         </Link>
         <Link
+          href="/chamber/scan"
+          className="px-3 py-1.5 rounded-md border border-accent/40 bg-accent/[0.05] text-accent hover:bg-accent/10"
+        >
+          📷 চেম্বার QR স্ক্যান
+        </Link>
+        <Link
           href="/access-log"
           className="px-3 py-1.5 rounded-md border border-foreground/15 hover:bg-foreground/5"
         >

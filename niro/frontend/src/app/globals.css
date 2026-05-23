@@ -32,3 +32,22 @@ body {
   font-family: var(--font-bangla), system-ui, sans-serif;
   font-feature-settings: "akhn", "blwf", "half", "pstf", "vatu", "rphf";
 }
+
+/* Print stylesheet — `analyses/[id]` becomes a clean PDF via browser print.
+ * Phase D PDF "export" is achieved with Ctrl/Cmd+P; we hide everything that
+ * isn't the analysis body. */
+@media print {
+  body {
+    background: white !important;
+  }
+  nav, header > button, button, a[href]:not(.print-keep) {
+    display: none !important;
+  }
+  main {
+    max-width: 100% !important;
+    padding: 1cm !important;
+  }
+  table { page-break-inside: avoid; }
+  section { page-break-inside: avoid; }
+  .text-accent { color: #0b6e4f !important; }
+}

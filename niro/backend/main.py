@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.routers import (
     analyses,
+    chamber,
     consent,
     doctor as doctor_router,
     doctors,
@@ -86,3 +87,4 @@ app.include_router(consent.router, prefix="/api/v1")
 app.include_router(verifications.router, prefix="/api/v1")
 app.include_router(doctor_router.router, prefix="/api/v1")
 app.include_router(doctors.router, prefix="/api/v1")
+app.include_router(chamber.router, prefix="/api/v1")
