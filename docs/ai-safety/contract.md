@@ -1,77 +1,149 @@
 # AI Safety — Contract
 
 > **Canonical reference:** [`DESIGN.md §5`](../../DESIGN.md#5-ai-integration-contract).
-> This file adds prompt versioning, calibration, and operational notes.
+> This file documents what's **actually built** through Phase D.
 
-## The interface
+## The interface — `backend/ai/provider.py`
 
 ```python
-# niro/backend/ai/provider.py
 class AIProvider(ABC):
-    @abstractmethod
-    def analyze_document(image_or_pdf_bytes, mime, hint_kind, history) -> DocumentAnalysis
-    @abstractmethod
-    def prepare_case_summary(target_analysis, history) -> CaseSummary
-    @abstractmethod
-    def check_drug_interaction(drug_a, drug_b) -> dict
+    def analyze_document(
+        image_or_pdf_bytes: bytes,
+        mime: str,
+        hint_kind: DocKind | None = None,
+        history: list[DocumentAnalysis] | None = None,
+    ) -> DocumentAnalysis: ...
+
+    def prepare_case_summary(
+        target_analysis: DocumentAnalysis,
+        history: list[DocumentAnalysis],
+    ) -> CaseSummary: ...
 ```
 
-Full types and concrete impl: see `DESIGN.md §5`.
+**Two methods cover the entire AI surface in Niro.** No feature code
+talks to OpenAI directly — everything goes through these.
+
+### Wire shapes (TypedDicts in `provider.py`)
+
+`DocumentAnalysis`:
+```python
+{
+    "kind": "prescription" | "lab_report" | "discharge" | "other",
+    "structured": dict,        # medications[], values[], patient, diagnosis
+    "explanation_bn": str,
+    "red_flags": list[{"label_bn": str, "severity": "info"|"warn"|"danger"}],
+    "questions_bn": list[str],
+    "confidence": float,       # 0..1
+    "model_name": str, "model_version": str,
+    "prompt_sha256": str, "output_sha256": str,
+    "latency_ms": int,
+}
+```
+
+`CaseSummary` (for the doctor):
+```python
+{
+    "patient_summary_bn": str,
+    "current_medications": list[StructuredMedication],
+    "ai_concerns": list[{"claim_id": str, "claim_bn": str, "severity": str}],
+    "questions_for_doctor": list[str],
+    "referenced_history": list[str],
+    "model_name": str, "model_version": str,
+    "prompt_sha256": str, "output_sha256": str,
+}
+```
 
 ## Implementations
 
 | Class | Module | Status |
 |---|---|---|
-| `AzureOpenAIProvider` | `niro/backend/ai/azure.py` | Phase B |
-| `ClaudeProvider` | `niro/backend/ai/claude.py` | Fallback, Phase F if needed |
-| `GeminiProvider` | `niro/backend/ai/gemini.py` | Fallback, Phase F if needed |
+| `AzureOpenAIProvider` | `backend/ai/azure.py` | **Active (D-004)** |
+| `ClaudeProvider` | (not yet) | Fallback — Phase F if needed |
+| `GeminiProvider` | (not yet) | Fallback — Phase F if needed |
 
-Selection via `AI_PROVIDER` env var. The factory `get_provider()` lives
-in `provider.py` and is the **only** import path feature code should use.
+Provider selected via `AI_PROVIDER` env var. Factory:
+`backend.ai.provider.get_provider()` returns the cached instance.
 
 ## Hard rules (enforced)
 
-1. AI **never** gives final medical advice — only extracts, explains, flags.
-2. Banned imperative phrases scanned post-call by `ai/policy.py`. A hit raises `AIPolicyViolation`.
-3. Every AI call wrapped by `AuditWriter.record_ai_call(...)` before returning.
-4. Confidence < threshold (0.5) → result returned but `recommend_human_review=True`.
+1. **AI never gives final medical advice.** Banned imperative phrases
+   scanned post-call by `ai/policy.py`. A hit raises `AIPolicyViolation`
+   which the analyze route catches → audit + 422 response.
+2. **Every AI call wrapped by audit logging.** `analyses.py` and
+   `doctor.py` (case-summary path) both record an `ai.*` event.
+3. **Confidence threshold = 0.5.** Below this, `recommend_human_review`
+   is `True` and the UI surfaces an explicit "ask a doctor" CTA.
 
-Banned phrase examples (Bangla regex list in `ai/prompts.py`):
-- `আপনি .* গ্রহণ করুন` (you should take ...)
-- `ডোজ বাড়ান` / `ডোজ কমান` (increase/decrease the dose)
-- `নতুন ওষুধ নিন` (take a new drug)
+## Banned phrase patterns (`ai/policy.py`)
 
-## Prompt versioning
+Bangla:
+- `আপনি ... গ্রহণ করুন` (you should take ...)
+- `আপনি ... খান`
+- `ডোজ বাড়ান/কমান/পরিবর্তন`
+- `নতুন ওষুধ নিন/শুরু করুন`
+- `আপনার ... আছে।` (confident diagnosis)
 
-Every system prompt gets a version string:
+English:
+- `you should take`
+- `increase/decrease your dose`
+- `start taking ...`
+- `you have <disease>` (regex with -itis/-emia/-osis/etc.)
 
-```python
-PRESCRIPTION_PROMPT_VERSION = "rx-bn-v1.0"
-PRESCRIPTION_PROMPT_BN = """..."""
-```
+False-positive risk: medication names matching patterns. We accept
+this — if the linter trips, we ask for human review rather than show
+the output.
 
-When you edit a prompt, **bump the patch version**. The version is written to `audit_log.detail.prompt_version` for traceability.
+## Prompts (`ai/prompts.py`)
 
-Golden tests in `niro/backend/tests/golden/` keep the prompts honest:
-fixed `(image, expected_keys)` pairs run on CI. A prompt edit that breaks
-a golden test = blocked merge.
+All prompts versioned with a constant. Bump the patch version when
+you edit a prompt body. Version is written to
+`audit_log.detail.prompt_version`.
+
+| Constant | Version |
+|---|---|
+| `PRESCRIPTION_PROMPT_BN` | `rx-bn-v1.0` |
+| `LAB_REPORT_PROMPT_BN` | `lab-bn-v1.0` |
+| `HISTORY_INTRO_BN` | `hist-bn-v1.0` |
+| `CASE_SUMMARY_PROMPT_BN` | `case-bn-v1.0` |
+
+In history-aware mode the analyze prompt is concatenated with
+`HISTORY_INTRO_BN` + a summary of the last 3 analyses (medications +
+short explanation). `prompt_version` becomes e.g. `rx-bn-v1.0+hist-bn-v1.0`.
 
 ## Calibration
 
-Each prompt asks the model to emit `_meta.confidence` (0–1).
-Empirically calibrate by running the golden set:
+Each prompt asks for `_meta.confidence` (0–1). Defaults to 0.7 if
+missing. UI mapping:
 
-```
-confidence ≥ 0.85 → "high"   (auto-display)
-confidence 0.50-0.85 → "medium" (display with caveat)
-confidence < 0.50 → "low"     (display "Please request human review")
-```
+| Confidence | UI tone | Behavior |
+|---|---|---|
+| `≥ 0.85` | Green | Show as authoritative |
+| `0.5–0.85` | Amber | Show with caveat |
+| `< 0.5` | Red | Show + auto-suggest human review |
 
-Re-calibrate when switching providers.
+## Latency we've actually measured
 
-## To be added during the build
+| Call | Latency |
+|---|---|
+| Bangla text only | 1-3s |
+| Structured JSON from text | 2-4s |
+| Vision (prescription) + structured | 8-12s |
+| Vision (lab) + Bangla + history-aware | 15-24s |
+| Case summary (text + history) | 5-9s |
+| Probe small call | 1.27s (last run) |
 
-- [ ] Phase B: actual prompt texts, with versions
-- [ ] Phase B: golden test results table (per-prompt accuracy)
-- [ ] Phase C: prompt for `prepare_case_summary` + version
-- [ ] Phase F: calibration sweep after any provider switch
+## Operational notes
+
+- **Auth header:** `Authorization: Bearer <key>` (NOT `api-key:`).
+- **`max_tokens` rejected** by `gpt-chat-latest` — use `max_completion_tokens` or omit. We omit.
+- **Image format:** `data:` URI with base64-encoded PNG/JPEG/WebP/PDF. See `niro/probe.py`.
+- **JSON output:** always pass `response_format={"type":"json_object"}`.
+- **History context:** capped at last 3 analyses to keep prompt size manageable.
+
+## Phase F additions
+
+- [ ] Golden test set (`niro/backend/tests/golden/`) — 5 fixed images with expected keys
+- [ ] Prompt regression detection in CI
+- [ ] Cost tracking script summing tokens × Azure unit cost
+- [ ] Claude provider implementation (fallback)
+- [ ] Gemini provider implementation (fallback)

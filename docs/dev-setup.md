@@ -252,6 +252,118 @@ OPEN | Phase A — Foundation: docker-compose, FastAPI backend, Next.js frontend
 
 ### All 6 green = Phase A verified. Proceed to Phase B.
 
+---
+
+## 8. Phase B–D smoke test — the full demo flow (14 steps, ~3 min)
+
+Run this after Phase A passes. Exercises every Phase A–D feature end-to-end.
+
+You'll need both the backend and frontend running, plus the AI key in `.env`.
+
+```bash
+BASE=http://localhost:8000/api/v1
+
+# --- Patient signs in ---
+curl -sX POST $BASE/auth/otp/request -H "Content-Type: application/json" \
+  -d '{"phone":"+8801711000099"}' > /dev/null
+
+PAT=$(curl -sX POST $BASE/auth/otp/verify -H "Content-Type: application/json" \
+  -d '{"phone":"+8801711000099","code":"123456","full_name":"রহিমা বেগম"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['access'])")
+
+# 1. Upload prescription
+DOC=$(curl -sX POST $BASE/documents -H "Authorization: Bearer $PAT" \
+  -F "file=@niro/sample_rx.png;type=image/png" -F "kind=prescription" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+
+# 2. AI analyze (no history) — expect ≥4 medications, confidence ≥0.7
+ANL=$(curl -sX POST $BASE/analyses -H "Authorization: Bearer $PAT" \
+  -H "Content-Type: application/json" \
+  -d "{\"document_id\":\"$DOC\",\"use_history\":false}")
+echo "$ANL" | python3 -c "import sys,json;r=json.load(sys.stdin);print('  meds:',len(r['structured'].get('medications',[])),'conf:',r['confidence'])"
+
+# 3. Upload lab report
+DOC2=$(curl -sX POST $BASE/documents -H "Authorization: Bearer $PAT" \
+  -F "file=@niro/sample_lab.png;type=image/png" -F "kind=lab_report" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+
+# 4. AI analyze WITH history — expect cross-reference language
+curl -sX POST $BASE/analyses -H "Authorization: Bearer $PAT" \
+  -H "Content-Type: application/json" \
+  -d "{\"document_id\":\"$DOC2\",\"use_history\":true}" \
+  | python3 -c "import sys,json;r=json.load(sys.stdin);print('  conf:',r['confidence'],'lat:',r['latency_ms'],'ms')"
+
+# 5. Browse doctors
+DR=$(curl -s "$BASE/doctors?specialty=diabetes" -H "Authorization: Bearer $PAT" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)[0]['id'])")
+
+# 6. Request verification
+REQ=$(curl -sX POST $BASE/verifications -H "Authorization: Bearer $PAT" \
+  -H "Content-Type: application/json" \
+  -d "{\"doctor_id\":\"$DR\",\"document_id\":\"$DOC\",\"scope\":\"full_history\",\"expires_in_hours\":24}" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+
+# 7. Mock-pay (2s)
+curl -sX POST "$BASE/verifications/$REQ/pay" -H "Authorization: Bearer $PAT" \
+  -H "Content-Type: application/json" -d '{}' > /dev/null
+
+# --- Doctor signs in ---
+curl -sX POST $BASE/auth/otp/request -H "Content-Type: application/json" \
+  -d '{"phone":"+88017000DOCTR1"}' > /dev/null
+DOC_TOK=$(curl -sX POST $BASE/auth/otp/verify -H "Content-Type: application/json" \
+  -d '{"phone":"+88017000DOCTR1","code":"123456"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['access'])")
+
+# 8. Doctor opens case (triggers AI case summary — 5-9s)
+curl -s "$BASE/doctor/cases/$REQ" -H "Authorization: Bearer $DOC_TOK" \
+  | python3 -c "import sys,json;c=json.load(sys.stdin);print('  case_summary present:',c['case_summary'] is not None)"
+
+# 9. Doctor submits review
+curl -sX POST "$BASE/doctor/cases/$REQ/review" -H "Authorization: Bearer $DOC_TOK" \
+  -H "Content-Type: application/json" \
+  -d '{"disposition":"agree","ai_claims_eval":[],"doctor_notes_bn":"AI সঠিক।"}' \
+  | python3 -m json.tool
+
+# 10. Patient timeline shows review
+curl -s $BASE/me/timeline -H "Authorization: Bearer $PAT" \
+  | python3 -c "import sys,json;items=json.load(sys.stdin);print('  timeline entries:',len(items),'has review:',any(i['entry_type']=='review' for i in items))"
+
+# --- Chamber flow ---
+# 11. Doctor opens chamber session
+SESS=$(curl -sX POST $BASE/chamber/session -H "Authorization: Bearer $DOC_TOK" \
+  -H "Content-Type: application/json" \
+  -d '{"chamber_address":"Popular Diagnostic, Dhanmondi"}')
+SID=$(echo "$SESS" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+QR=$(echo "$SESS" | python3 -c "import sys,json;print(json.load(sys.stdin)['qr_token'])")
+
+# 12. Patient scans (creates consent + binds)
+curl -sX POST "$BASE/chamber/session/$QR/scan" -H "Authorization: Bearer $PAT" \
+  -H "Content-Type: application/json" \
+  -d '{"scope":"full_history","expires_in_hours":2}' > /dev/null
+
+# 13. Doctor loads patient profile in chamber
+curl -s "$BASE/chamber/session/$SID/profile" -H "Authorization: Bearer $DOC_TOK" \
+  | python3 -c "import sys,json;p=json.load(sys.stdin);print('  patient:',p['patient_name'],'timeline:',len(p['timeline']))"
+
+# 14. Close session (revokes consent)
+curl -sX POST "$BASE/chamber/session/$SID/close" -H "Authorization: Bearer $DOC_TOK" > /dev/null
+
+# --- Inspect audit log ---
+docker compose exec -T postgres psql -U niro -d niro \
+  -c "SELECT event, count(*) FROM audit_log GROUP BY event ORDER BY count(*) DESC LIMIT 20;"
+```
+
+**Expect 12+ distinct event types** in the audit log including
+`ai.analyze.history_aware`, `consent.granted` (3×: from /consents, from
+/verifications, from /chamber), `chamber.session.opened`,
+`chamber.session.bound`, `chamber.session.closed`,
+`doctor.view.case_summary`, `doctor.view.timeline`,
+`doctor.review.submitted`, `payment.mock_paid`,
+`ai.case_summary`.
+
+If all 14 steps pass + 12+ event types appear → Phase A–D end-to-end is
+verified. You're ready for Phase E (video recording).
+
 ## 8. Stopping cleanly
 
 ```bash
@@ -266,12 +378,16 @@ docker compose down -v    # ALSO deletes the volume (full reset)
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `psycopg2.OperationalError: could not connect` | Postgres not up | `docker compose up -d postgres` |
-| `openai.APIError: 401` | Wrong key | Rotate + re-paste; see `env-vars.md` |
+| `openai.AuthenticationError: 401` | Wrong key (often trailing whitespace) | Verify `.env` `AZURE_OPENAI_KEY` last 4 chars match Azure portal exactly; see `build-log.md` Day 2 |
 | `openai.BadRequestError: content_filter` | Azure content filter | Switch `AI_PROVIDER=claude`, see `ai-safety/contract.md` |
-| `alembic.util.exc.CommandError: Can't locate revision` | Out-of-sync migrations | `alembic downgrade base && alembic upgrade head` |
+| `openai.BadRequestError` mentioning `max_tokens` | `gpt-chat-latest` uses `max_completion_tokens` | Our code omits `max_tokens` — if you see this, check you didn't add one |
+| `alembic.util.exc.CommandError: Can't locate revision` | Out-of-sync migrations | `alembic downgrade base && alembic upgrade head` then re-seed doctors |
+| `Bcrypt … 72 bytes` from passlib | passlib + bcrypt 5.x incompat | We bypassed via D-009 (sha256+salt). If you re-introduced bcrypt: pin `bcrypt<4` |
 | `next: command not found` | Forgot `npm install` | `cd niro/frontend && npm install` |
-| Bangla shows boxes | Font failed to load | Check `niro/frontend/app/layout.tsx` — see `frontend/bangla-typography.md` |
+| Bangla shows boxes | Font failed to load | Check `niro/frontend/src/app/layout.tsx` + `globals.css`; see `frontend/bangla-typography.md` |
+| Next.js page errors on `params.id` | Next 16 made `params` a Promise | Use `use(params)` in client components; `await props.params` in server |
 | `port 5432 already in use` | Local Postgres running | `sudo systemctl stop postgresql` or change port in `docker-compose.yml` |
+| Chamber QR scan fails silently | Camera permission denied or non-HTTPS in browser | Use `localhost` (not `127.0.0.1`); allow camera; manual paste fallback works |
 
 For anything not on this list, append to [`build-log.md`](build-log.md)
 with the error and what you tried.
