@@ -8,9 +8,9 @@
 
 Niro is a three-tier web app:
 
-1. **Frontend** — Next.js 15 PWA, single app with three route groups (patient / doctor / chamber).
+1. **Frontend** — Next.js 16 PWA with authenticated patient and verified-doctor route groups plus public auth/chamber routes.
 2. **Backend** — FastAPI service, stateless, all DB writes and AI orchestration here.
-3. **Storage** — PostgreSQL 16 + pgvector for structured data; local FS (dev) or S3-compatible (prod) for blobs.
+3. **Storage** — PostgreSQL 16 for structured data; local FS (dev) or S3-compatible (prod) for blobs. pgvector is deferred.
 
 External dependency: **Azure OpenAI `gpt-chat-latest`** (with `AIProvider` abstraction for Claude/Gemini fallback).
 

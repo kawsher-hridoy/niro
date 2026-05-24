@@ -21,8 +21,9 @@ Build-time engineering docs for the Niro project.
 | F — Live-demo polish | Conditional | post 30 May shortlist |
 | G — Demo day | Conditional | 15 June |
 
-29 backend endpoints, 14 frontend pages, 11 DB tables, 15 distinct audit
-event types in use, 6 seeded doctors.
+39 router endpoints plus health, 20 URL-visible frontend pages, 14 DB
+models, 15+ distinct audit event types in use, 6 seeded doctors, and
+dev-mode doctor applications that auto-verify for demos.
 
 ---
 
@@ -32,15 +33,15 @@ event types in use, 6 seeded doctors.
 - [`dev-setup.md`](dev-setup.md) — 10-minute onboarding from clone to working health check; 14-step Phase-1 smoke test
 - [`env-vars.md`](env-vars.md) — every environment variable explained
 - [`mocks.md`](mocks.md) — Phase-1 safe mocks (OTP, bKash, BMDC) — what's faked and why
-- [`build-log.md`](build-log.md) — daily progress diary (Day 0 through Day 4)
-- [`decisions.md`](decisions.md) — locked decisions D-001..D-010
+- [`build-log.md`](build-log.md) — daily progress diary (Day 0 through active Day 5 fixes)
+- [`decisions.md`](decisions.md) — locked decisions D-001..D-012
 - [`open-questions.md`](open-questions.md) — still-TBD items with default answers
 - [`glossary.md`](glossary.md) — Bangla terms, medical abbreviations, project acronyms
 
 ### Architecture
 - [`architecture/overview.md`](architecture/overview.md) — system shape, components → `DESIGN.md §1–2`
 - [`architecture/data-model.md`](architecture/data-model.md) — SQL schema + migrations → `DESIGN.md §3`
-- [`architecture/api-surface.md`](architecture/api-surface.md) — all 29 endpoints with examples → `DESIGN.md §4`
+- [`architecture/api-surface.md`](architecture/api-surface.md) — current endpoint inventory with examples → `DESIGN.md §4`
 - [`architecture/storage.md`](architecture/storage.md) — Postgres, blobs, pgvector → `DESIGN.md §8`
 
 ### AI safety
@@ -94,4 +95,4 @@ event types in use, 6 seeded doctors.
 
 ---
 
-*Last updated: 23 May 2026 (post Phase D merge).*
+*Last updated: 24 May 2026 (post Day-5 Fix #4: doctor onboarding + verified doctor dashboard).*

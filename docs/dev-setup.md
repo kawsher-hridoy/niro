@@ -264,10 +264,10 @@ You'll need both the backend and frontend running, plus the AI key in `.env`.
 BASE=http://localhost:8000/api/v1
 
 # --- Patient signs in ---
-curl -sX POST $BASE/auth/otp/request -H "Content-Type: application/json" \
+curl -sX POST $BASE/auth/login/otp/request -H "Content-Type: application/json" \
   -d '{"phone":"+8801711000099"}' > /dev/null
 
-PAT=$(curl -sX POST $BASE/auth/otp/verify -H "Content-Type: application/json" \
+PAT=$(curl -sX POST $BASE/auth/login/otp/verify -H "Content-Type: application/json" \
   -d '{"phone":"+8801711000099","code":"123456","full_name":"রহিমা বেগম"}' \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['access'])")
 
@@ -308,9 +308,9 @@ curl -sX POST "$BASE/verifications/$REQ/pay" -H "Authorization: Bearer $PAT" \
   -H "Content-Type: application/json" -d '{}' > /dev/null
 
 # --- Doctor signs in ---
-curl -sX POST $BASE/auth/otp/request -H "Content-Type: application/json" \
+curl -sX POST $BASE/auth/login/otp/request -H "Content-Type: application/json" \
   -d '{"phone":"+88017000DOCTR1"}' > /dev/null
-DOC_TOK=$(curl -sX POST $BASE/auth/otp/verify -H "Content-Type: application/json" \
+DOC_TOK=$(curl -sX POST $BASE/auth/login/otp/verify -H "Content-Type: application/json" \
   -d '{"phone":"+88017000DOCTR1","code":"123456"}' \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['access'])")
 

@@ -1,7 +1,7 @@
 # AI Safety — Audit Logging
 
 This doc defines the **audit event taxonomy** for Niro and tracks the
-**actual events in use** as of Phase D.
+**actual events in use** as of Day-5 Fix #4.
 
 The `audit_log` table schema lives in [`DESIGN.md §3`](../../DESIGN.md#3-data-model).
 
@@ -23,7 +23,7 @@ The `audit_log` table schema lives in [`DESIGN.md §3`](../../DESIGN.md#3-data-m
 
 Both are append-only.
 
-## Actual events in use (Phase D)
+## Actual events in use
 
 15+ distinct event types confirmed in `audit_log` during the full smoke
 test.

@@ -1,7 +1,7 @@
 # AI Safety — Contract
 
 > **Canonical reference:** [`DESIGN.md §5`](../../DESIGN.md#5-ai-integration-contract).
-> This file documents what's **actually built** through Phase D.
+> This file documents what's **actually built** through Day-5 Fix #4.
 
 ## The interface — `backend/ai/provider.py`
 

@@ -117,7 +117,7 @@ recording every action.
 | Styling | **Tailwind 4** (`@theme inline` in CSS, no config file) | Modern, minimal |
 | Fonts | Noto Sans Bengali via `next/font/google` | Bangla-first UI |
 | QR | `qrcode.react` (generate) + `html5-qrcode` (scan) | Camera-based chamber flow |
-| Auth | Phone OTP (mock `123456` in dev) → JWT HS256 | OTP storage via `sha256(salt:code)` — see [D-009](docs/decisions.md) |
+| Auth | Patient signup/password login/reset + legacy OTP; doctor application + seeded doctor OTP → JWT HS256 | Passwords use Argon2id (D-012); OTP storage uses `sha256(salt:code)` (D-009). Dev doctor applications auto-verify when `APP_ENV != "prod"`. |
 | Hosting | Docker compose locally · Hetzner/DO single VPS + Caddy in Phase F | Boring, cheap, fits the demo budget |
 | Dep manager | **uv** 0.11.x | 10-100× faster than pip |
 
@@ -260,7 +260,7 @@ source .venv/bin/activate
 uv pip install -e ./backend
 ```
 
-Apply migrations (creates all 11 tables):
+Apply migrations (creates the current schema):
 
 ```bash
 alembic -c alembic.ini upgrade head
@@ -312,16 +312,17 @@ Six tests run — Bangla generation, structured JSON, vision on prescription, vi
 
 ## How to log in
 
-The app uses phone + OTP. In dev mode, **the OTP is always `123456`**.
+Patients can use password signup/login, password reset, or the legacy OTP path.
+In dev mode, **the OTP is always `123456`**.
 
 ### Patient login
 
-1. Go to <http://localhost:3000/signin>
-2. Enter any phone (e.g., `+8801711000099`). Click "OTP পাঠান".
-3. On `/verify`, enter code `123456`. Optionally enter your name (saved as Bangla string).
-4. You land on `/home`.
+1. Go to <http://localhost:3000/signin>.
+2. Use the sign-up tab for a new patient, or the sign-in tab for an existing email/phone + password account.
+3. For the legacy OTP demo path, use `/signin/otp`, enter any phone (e.g., `+8801711000099`), then enter code `123456` on `/verify`.
+4. You land on `/home`, the authenticated patient dashboard inside the app shell.
 
-If the phone has never been used, a new patient account is created
+If the legacy OTP phone has never been used, a new patient account is created
 automatically. If it's been used before, you're logged into the existing
 account.
 
@@ -338,11 +339,19 @@ The seed script created these phones for the 6 doctors. Each uses OTP `123456`:
 | `+88017000DOCTR5` | Dr. Sumaiya Akter | Pediatrics, Child | 2 | Tk 400 |
 | `+88017000DOCTR6` | Dr. Rashed Khan | ENT (Nose, Throat, Ear) | 1 | Tk 200 |
 
-After login as a doctor, you'll be on `/home` but most patient features
-won't work for you. Navigate to:
+After login as a seeded doctor, you land on `/doctor-portal/dashboard`
+inside the verified-doctor shell. Use:
 
+- `/doctor-portal/dashboard` — verified doctor SaaS dashboard
 - `/doctor-portal/inbox` — pending paid verification requests
 - `/doctor-portal/chamber` — open a new chamber session (QR + 2s polling)
+
+### Doctor application signup
+
+On `/signin`, use the **ডাক্তার** tab to apply as a doctor. In local/dev
+mode (`APP_ENV != "prod"`) applications auto-verify so the demo can go
+straight to `/doctor-portal/dashboard`. In production, applications stay
+on `/doctor-portal/pending` until BMDC/admin verification.
 
 ### Why mock OTP?
 
@@ -490,10 +499,12 @@ patient + doctor + chamber flow in ~3 minutes.
 
 | Path | What it does |
 |---|---|
-| `/` | Public landing — three feature cards, Get Started CTA |
-| `/signin` | Phone input, sends OTP request |
-| `/verify` | OTP entry, optional name on signup, saves session |
-| `/home` | Patient dashboard with upload CTA, document list, nav chips |
+| `/` | Public marketing landing — six-section healthcare site |
+| `/signin` | Patient sign in/sign up, password reset entry, and doctor application tab |
+| `/signin/otp` | Legacy phone OTP login path |
+| `/verify` | OTP verification for signup/reset/legacy OTP, saves session |
+| `/forgot-password` | Password reset request surface |
+| `/home` | Patient SaaS dashboard with stats, quick actions, recent documents, AI insights, and access activity |
 | `/upload` | Pick file + kind, upload, auto-analyze. `?document=<id>` re-analyzes existing doc |
 | `/analyses/[id]` | Bangla explanation, red flags, medications table, lab values table, doctor questions. **🖨 PDF** button calls `window.print()`. |
 | `/timeline` | Chronological list of all events (uploads, analyses, doctor reviews) |
@@ -509,6 +520,8 @@ patient + doctor + chamber flow in ~3 minutes.
 
 | Path | What it does |
 |---|---|
+| `/doctor-portal/pending` | Pending-review page for unverified doctor applications |
+| `/doctor-portal/dashboard` | Verified doctor dashboard: queue stats, urgent reviews, completed reviews, access activity, chamber shortcut |
 | `/doctor-portal/inbox` | List of paid verification requests, split into Pending / Done |
 | `/doctor-portal/cases/[id]` | AI case-summary card + target analysis + history + review form |
 | `/doctor-portal/chamber` | 4-phase state machine: init (set address) → waiting (QR + 2s poll) → bound (patient profile + add prescription) → closed |
@@ -527,13 +540,13 @@ pydantic-settings reading `.env`. **The only place env vars are read.** Don't `o
 
 | File | Responsibility |
 |---|---|
-| `auth.py` | OTP request/verify, JWT issuance, refresh, logout |
+| `auth.py` | Patient signup/verify/resend, password login/reset, doctor application, legacy OTP login, JWT refresh/logout |
 | `documents.py` | Upload (multipart, 10MB cap, sha256), list, get, delete |
 | `analyses.py` | AI analyze with optional history; list patient's analyses; get one |
-| `profile.py` | Patient `/me`, timeline (merges docs + analyses + reviews chronologically), access log, DPA-2023 delete |
+| `profile.py` | `/me`, patient dashboard aggregate, timeline (merges docs + analyses + reviews chronologically), access log, DPA-2023 delete |
 | `consent.py` | Grant / revoke explicit consents |
 | `verifications.py` | Patient creates a paid review request; mock-pay (2s); list; get |
-| `doctor.py` | Doctor inbox, case view (consent-gated, AI summary on demand), submit review |
+| `doctor.py` | Doctor status, verified dashboard, inbox, case view (consent-gated, AI summary on demand), submit review |
 | `doctors.py` | Public directory search; full profile; submit a patient review (verified-consult only) |
 | `chamber.py` | Open session (QR), scan (consent + bind), poll, get-profile (consent-gated + access log + audit), write prescription, close |
 
@@ -541,7 +554,7 @@ pydantic-settings reading `.env`. **The only place env vars are read.** Don't `o
 
 | File | Responsibility |
 |---|---|
-| `auth.py` | JWT make/decode, `current_user` / `require_patient` / `require_doctor` dependencies |
+| `auth.py` | JWT make/decode, password hash/verify, `current_user` / `require_patient` / `require_doctor` / `require_verified_doctor` dependencies |
 | `audit.py` | Append-only audit writer. **Every** mutating route calls this. |
 | `consent.py` | `ConsentGuard` — every doctor-side patient-data read goes through `find_active_consent` + `record_access` |
 | `storage.py` | Local blob writer with sha256. Layout: `<patient_id>/<doc_id>.<ext>` |
@@ -561,8 +574,8 @@ pydantic-settings reading `.env`. **The only place env vars are read.** Don't `o
 |---|---|
 | `base.py` | `DeclarativeBase` |
 | `session.py` | sync engine + `SessionLocal` + `get_db` FastAPI dep |
-| `models.py` | All 11 SQLAlchemy models (User, OtpCode, PatientProfile, DoctorProfile, Document, Analysis, Consent, AccessLog, AuditLog, VerificationRequest, VerificationReview, DoctorReview, ChamberSession) |
-| `migrations/` | Alembic; 3 revisions (Phase A init, Phase B AI/consent, Phase C verification/chamber) |
+| `models.py` | Current SQLAlchemy models, including auth, patient/doctor profiles, documents, analyses, consent, access/audit logs, verification, reviews, chamber sessions, and pending signups |
+| `migrations/` | Alembic revisions through email/password auth (`0004`) |
 
 ### Seeds
 
@@ -579,7 +592,8 @@ pydantic-settings reading `.env`. **The only place env vars are read.** Don't `o
 
 ### Frontend components
 
-`src/components/` is empty as of Fix #1. The previous global
+`src/components/` now contains the reusable app shell (`AppShellGate`,
+`AppShell`, `Sidebar`, `Topbar`) and `EmptyState`. The previous global
 `DisclaimerBanner` was removed (see D-011 in `docs/decisions.md`) —
 disclaimer copy now appears inline on AI-output pages
 (e.g. `analyses/[id]/page.tsx`) rather than as a global banner.
@@ -628,7 +642,7 @@ Landing-page subcomponents live inline in `app/page.tsx`.
 **Why this shape:**
 
 - One process per concern, no microservices. 23-day deadline.
-- One PWA with three route groups, not three separate apps.
+- One PWA with route groups for authenticated patient and verified doctor shells, not separate apps.
 - AI is the only external network hop. Everything else is local.
 
 Full system design with rationale: [`DESIGN.md`](DESIGN.md).
@@ -667,8 +681,8 @@ Full system design with rationale: [`DESIGN.md`](DESIGN.md).
     │   └── seeds/                    # 6 seeded doctors
     └── frontend/                     # Next.js 16
         └── src/
-            ├── app/                  # 14 pages (incl. marketing landing in page.tsx)
-            ├── components/           # empty (DisclaimerBanner removed in Fix #1, D-011)
+            ├── app/                  # route groups + 20 URL-visible pages
+            ├── components/           # app-shell components + EmptyState
             └── lib/                  # api.ts, i18n.ts
 ```
 
@@ -691,10 +705,10 @@ Full system design with rationale: [`DESIGN.md`](DESIGN.md).
 
 ## Decisions & open questions
 
-10 locked decisions guide the code — names, tech choices, safety rules.
+12 locked decisions guide the code — names, tech choices, safety rules.
 See:
 
-- [`docs/decisions.md`](docs/decisions.md) — D-001..D-010 with rationale + alternatives
+- [`docs/decisions.md`](docs/decisions.md) — D-001..D-012 with rationale + alternatives
 - [`docs/open-questions.md`](docs/open-questions.md) — still-TBD items
 - [`docs/mocks.md`](docs/mocks.md) — what's faked in Phase 1 (OTP, bKash, BMDC) and the replacement plan for each
 
@@ -741,10 +755,10 @@ The full doc set:
 - [`docs/README.md`](docs/README.md) — navigation hub
 - [`docs/dev-setup.md`](docs/dev-setup.md) — onboarding + Phase A and Phase B-D smoke tests
 - [`docs/env-vars.md`](docs/env-vars.md) — every env var documented
-- [`docs/decisions.md`](docs/decisions.md) — D-001..D-010
+- [`docs/decisions.md`](docs/decisions.md) — D-001..D-012
 - [`docs/open-questions.md`](docs/open-questions.md) — still-TBD items
 - [`docs/mocks.md`](docs/mocks.md) — Phase-1 mocks
-- [`docs/build-log.md`](docs/build-log.md) — daily progress diary (Days 0-4)
+- [`docs/build-log.md`](docs/build-log.md) — daily progress diary (Days 0-5 fixes)
 - [`docs/glossary.md`](docs/glossary.md) — Bangla terms, medical abbreviations
 - [`docs/architecture/`](docs/architecture/) — overview, data-model, api-surface, storage
 - [`docs/ai-safety/`](docs/ai-safety/) — contract, security-compliance, audit-logging

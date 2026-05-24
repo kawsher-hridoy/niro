@@ -1,12 +1,12 @@
 ---
 name: niro
-description: Use when working on the Niro health-app codebase — implementing features, debugging the AI provider integration, reasoning about ICADHI submission constraints, or extending any of the 11 tables / 29 endpoints / 14 frontend pages. Reflects state as of end of Phase D + Fix #1 (Phase 1 feature-complete; iterative issue-fix loop active).
+description: Use when working on the Niro health-app codebase — implementing features, debugging the AI provider integration, reasoning about ICADHI submission constraints, or extending the current FastAPI/Next.js codebase. Reflects state as of Day-5 Fix #4: SaaS auth, app shell, patient dashboard, doctor onboarding, and verified-doctor dashboard are merged; iterative issue-fix loop active.
 ---
 
 # Niro project skill
 
 Use this when work touches Niro (the IEEE ICADHI 2026 health app in this
-repo). Reflects state **as of end of Phase D + Fix #1 — Phase 1 is
+repo). Reflects state **as of Day-5 Fix #4 — Phase 1 is
 feature-complete; the user is driving an iterative issue-fix loop until
 the 27 May Phase-1 video submission**.
 
@@ -28,12 +28,12 @@ Live engineering docs: `docs/` folder.
 | B — AI integration + upload path | ✅ Merged (PR #2) |
 | C — Profile + verification + doctor portal | ✅ Merged (PR #3) |
 | D — Chamber QR + browser PDF + polish | ✅ Merged (PR #4) |
-| **Day 5 — iterative issue fixes** | 🔧 **Active** — branch-per-issue loop; Fix #1 (landing redesign) merged |
+| **Day 5 — iterative issue fixes** | 🔧 **Active** — Fix #1 landing, Fix #2 SaaS auth, Fix #3 app shell/dashboard, Fix #4 doctor onboarding/dashboard merged |
 | **E — Video submission** | ⏳ **User action** — record + upload by 27 May |
 | F — Live-demo polish + VPS deploy | Conditional on 30 May shortlist |
 | G — Demo day | 15 June |
 
-`main` is at `9083b0c` (post Fix #1 + CLAUDE.md reflow, pushed to origin).
+`main` has Day-5 Fix #4 pushed (`7f3ee31` plus build-log commit `4d57fbe`).
 Read `docs/build-log.md` Day 4 first, then Day 5 for the active fix loop.
 
 **Active workflow plan:** `/home/l0minex/.claude/plans/twinkly-inventing-pebble.md` v2.0
@@ -86,25 +86,26 @@ Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also nee
 
 ## Current code paths — what exists, where
 
-### Database (11 tables, 3 migrations)
+### Database (current schema, 4 migrations)
 
 | Migration | Tables added |
 |---|---|
 | `d99530cae0c6` (Phase A) | users, otp_codes, patient_profiles, doctor_profiles, documents |
 | `a376ab1ca234` (Phase B) | analyses, audit_log, access_logs, consents |
 | `28e9c4a069e8` (Phase C) | verification_requests, verification_reviews, doctor_reviews, chamber_sessions |
+| `0004_email_password_auth` (Fix #2) | email/password auth fields, pending_signups, otp purpose |
 
-### Backend (29 endpoints)
+### Backend (39 router endpoints + health)
 
 | Module | Routes |
 |---|---|
-| `routers/auth.py` | `POST /auth/otp/{request,verify}`, `POST /auth/refresh`, `POST /auth/logout` |
+| `routers/auth.py` | signup, signup verify/resend, doctor apply, password login/reset, legacy OTP login, refresh, logout |
 | `routers/documents.py` | `POST /documents`, `GET /documents`, `GET /documents/{id}`, `DELETE /documents/{id}` |
 | `routers/analyses.py` | `POST /analyses` (with `use_history`), `GET /analyses/{id}`, `GET /analyses` |
-| `routers/profile.py` | `GET /me`, `PATCH /me`, `GET /me/timeline`, `GET /me/access-log`, `DELETE /me` |
+| `routers/profile.py` | `GET /me`, `PATCH /me`, `GET /me/dashboard`, `GET /me/timeline`, `GET /me/access-log`, `DELETE /me` |
 | `routers/consent.py` | `POST /consents`, `POST /consents/{id}/revoke` |
 | `routers/verifications.py` | `POST /verifications`, `POST /verifications/{id}/pay`, `GET /verifications`, `GET /verifications/{id}` |
-| `routers/doctor.py` | `GET /doctor/inbox`, `GET /doctor/cases/{id}`, `POST /doctor/cases/{id}/review` |
+| `routers/doctor.py` | `GET /doctor/status`, `GET /doctor/dashboard`, `GET /doctor/inbox`, `GET /doctor/cases/{id}`, `POST /doctor/cases/{id}/review` |
 | `routers/doctors.py` | `GET /doctors`, `GET /doctors/{id}`, `POST /doctors/{id}/reviews` |
 | `routers/chamber.py` | `POST /chamber/session`, `POST /chamber/session/{token}/scan`, `GET /chamber/session/{id}`, `GET /chamber/session/{id}/profile`, `POST /chamber/session/{id}/prescription`, `POST /chamber/session/{id}/close` |
 | `main.py` | `GET /api/v1/health` |
@@ -116,7 +117,7 @@ Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also nee
 | `services/audit.py` | `record(db, event, **kwargs)` |
 | `services/consent.py` | `find_active_consent`, `require`, `record_access`, `PermissionDenied` |
 | `services/storage.py` | `write_blob`, `read_blob`, `absolute_path`, `ext_for_mime` |
-| `services/auth.py` | `make_token`, `decode_token`, `current_user`, `require_patient`, `require_doctor`, `require_admin` |
+| `services/auth.py` | `make_token`, `decode_token`, password hash/verify, `current_user`, `require_patient`, `require_doctor`, `require_verified_doctor`, `require_admin` |
 
 ### AI layer
 
@@ -127,13 +128,13 @@ Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also nee
 | `ai/prompts.py` | Versioned Bangla prompts: `PRESCRIPTION_PROMPT_BN` (rx-bn-v1.0), `LAB_REPORT_PROMPT_BN` (lab-bn-v1.0), `HISTORY_INTRO_BN` (hist-bn-v1.0), `CASE_SUMMARY_PROMPT_BN` (case-bn-v1.0) |
 | `ai/policy.py` | `assert_compliant(payload)` raises `AIPolicyViolation` on banned phrases |
 
-### Frontend (14 pages)
+### Frontend (route groups + 19 URL-visible pages)
 
 | Path | Notes |
 |---|---|
 | `app/page.tsx` | Public landing — **post-Fix-#1 it's a 6-section marketing site** (sticky nav, hero + CSS phone mockup, trust strip, feature cards, how-it-works, final CTA, footer). All subcomponents inline in this file (`SiteNav`, `Hero`, `PhoneMockup`, `TrustStrip`, `Stat`, `Features`, `FeatureCard`, `HowItWorks`, `Step`, `FinalCTA`, `SiteFooter`). Server component, no client interactivity. |
-| `app/signin/`, `app/verify/` | OTP flow |
-| `app/home/` | Patient dashboard + nav chips |
+| `app/signin/`, `app/signin/otp/`, `app/verify/`, `app/forgot-password/` | patient signup/password login/reset, legacy OTP, doctor application |
+| `app/(app)/home/` | Patient SaaS dashboard inside authenticated shell |
 | `app/upload/` | File picker + auto-analyze (supports `?document=` re-analyze) |
 | `app/analyses/[id]/` | Result view + 🖨 PDF (browser print) — handles async `params` via `use(params)` |
 | `app/timeline/` | Vertical timeline of all events |
@@ -142,9 +143,11 @@ Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also nee
 | `app/access-log/` | Patient-visible access log |
 | `app/chamber/scan/` | Camera QR scanner (html5-qrcode) + manual fallback |
 | `app/chamber/[token]/` | Patient consent dialog (scope picker + duration slider) |
-| `app/doctor-portal/inbox/` | Doctor inbox (Pending / Done split) |
-| `app/doctor-portal/cases/[id]/` | Case view (AI summary + target analysis + history + review form) |
-| `app/doctor-portal/chamber/` | 4-phase state machine: init → waiting (QR + poll) → bound → closed |
+| `app/doctor-portal/pending/` | unverified doctor pending state |
+| `app/(doctor)/doctor-portal/dashboard/` | verified doctor dashboard |
+| `app/(doctor)/doctor-portal/inbox/` | Doctor inbox (Pending / Done split) |
+| `app/(doctor)/doctor-portal/cases/[id]/` | Case view (AI summary + target analysis + history + review form) |
+| `app/(doctor)/doctor-portal/chamber/` | 4-phase state machine: init → waiting (QR + poll) → bound → closed |
 
 ## Code patterns to follow
 
@@ -204,12 +207,14 @@ export default function Page({ params }: PageProps) {
 - Adding routes that read patient data without a `ConsentGuard.require` or `find_active_consent` check.
 - Using Next.js 14/15 patterns — see CLAUDE.md "Next.js 16 gotchas".
 - Adding a `tailwind.config.ts` — Tailwind 4 uses `@theme inline`.
-- Reaching for bcrypt for short-lived secrets (D-009).
+- Reaching for bcrypt for short-lived secrets (D-009), or replacing Argon2id for stored passwords (D-012).
 - Importing `images.domains` config (deprecated in Next 16).
 - **Recreating `DisclaimerBanner`** — deleted in Fix #1 (D-011). The disclaimer copy belongs inline on AI-output pages, not in a global banner.
 - **Reintroducing dark mode** for Phase 1 — light-mode only (D-011). Don't add `prefers-color-scheme: dark` overrides.
 - **Hard-coding hex colors** in new pages — use the tokens in `globals.css` (`--color-primary`, `--color-muted`, `--color-card`, `--color-card-border`, `--color-accent-soft`, etc.). `--color-accent` is an alias of `--color-primary`, kept for backward compatibility with existing `text-accent`/`bg-accent` utility classes.
 - **Committing fixes directly to `main`** during the issue-fix loop — branch per issue, squash-merge after user approval (see CLAUDE.md "Issue-fix workflow").
+- Moving authenticated patient/doctor routes out of `(app)` / `(doctor)` route groups; the shell depends on those groups while preserving public URLs.
+- Letting pending doctors reach patient data; doctor portal data routes require `require_verified_doctor`.
 
 ## Common operations
 
@@ -221,7 +226,7 @@ export default function Page({ params }: PageProps) {
 | Re-seed doctors | `python -m backend.seeds.doctors` (idempotent) |
 | AI probe | `set -a && source ../.env && set +a && .venv/bin/python probe.py` |
 | Type-check frontend | `npx tsc --noEmit` |
-| Sign in as doctor | OTP request `+88017000DOCTR1` through `DOCTR6`, code `123456` |
+| Sign in as seeded doctor | OTP request `+88017000DOCTR1` through `DOCTR6`, code `123456`; lands on `/doctor-portal/dashboard` |
 | Audit log peek | `docker compose exec -T postgres psql -U niro -d niro -c "SELECT event, count(*) FROM audit_log GROUP BY event;"` |
 
 ## When this skill is helpful

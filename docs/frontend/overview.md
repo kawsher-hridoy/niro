@@ -1,7 +1,7 @@
 # Frontend — Overview
 
 > **Canonical reference:** [`DESIGN.md §7`](../../DESIGN.md#7-frontend-architecture).
-> This file captures the **actual** built structure through Phase D.
+> This file captures the **actual** built structure through Day-5 Fix #4.
 
 ## Stack
 
@@ -23,19 +23,20 @@ app/
 ├── layout.tsx          # global: HTML lang="bn", Noto Sans Bengali (no global banner — D-011)
 ├── globals.css         # Tailwind 4 @theme + Bangla OpenType + print stylesheet + healthcare token palette
 ├── page.tsx            # public marketing landing (6 sections, Fix #1 — all subcomponents inline)
-├── signin/, verify/    # auth
-├── home/, upload/      # patient happy path
-├── analyses/[id]/      # patient AI result (with PDF print)
-├── timeline/
-├── doctors/, doctors/[id]/
-├── verifications/, verifications/[id]/
-├── access-log/
-├── chamber/scan/                       # patient QR scanner
-├── chamber/[token]/                    # patient consent dialog
-└── doctor-portal/
+├── signin/, signin/otp/, verify/, forgot-password/  # auth
+├── (app)/layout.tsx                  # patient shell
+├── (app)/home/, upload/, timeline/, access-log/
+├── (app)/analyses/[id]/              # patient AI result (with PDF print)
+├── (app)/doctors/, (app)/doctors/[id]/
+├── (app)/verifications/, (app)/verifications/[id]/
+├── chamber/scan/                      # patient QR scanner
+├── chamber/[token]/                   # patient consent dialog
+├── doctor-portal/pending/             # pending doctor state
+└── (doctor)/doctor-portal/
+    ├── dashboard/
     ├── inbox/
     ├── cases/[id]/
-    └── chamber/                        # doctor QR generator + state machine
+    └── chamber/                      # verified doctor QR generator + state machine
 ```
 
 Full file paths in [`components.md`](components.md).

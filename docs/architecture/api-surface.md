@@ -1,7 +1,7 @@
 # Architecture — API Surface
 
 > **Canonical reference:** [`DESIGN.md §4`](../../DESIGN.md#4-api-surface).
-> This file lists every endpoint **as actually built** through Phase D
+> This file lists every endpoint **as actually built** through Day-5 Fix #4
 > with curl examples for the demo path.
 
 ## API base
@@ -16,15 +16,22 @@ All responses JSON. Errors:
 
 Auth via `Authorization: Bearer <jwt>` header. JWT access tokens 1h, refresh 30d.
 
-## Full endpoint table (29 endpoints — all live as of Phase D)
+## Full endpoint table (39 router endpoints + health — current)
 
 | Method | Path | Auth | Body | Returns |
 |---|---|---|---|---|
 | **Health** | | | | |
 | GET | `/health` | none | — | `{ok,service,version,time}` |
 | **Auth** | | | | |
-| POST | `/auth/otp/request` | none | `{phone}` | `{ok,dev_hint?}` |
-| POST | `/auth/otp/verify` | none | `{phone,code,full_name?}` | `{access,refresh,role,user_id}` |
+| POST | `/auth/signup/start` | none | `{full_name,email,phone,password}` | `{ok,signup_token}` |
+| POST | `/auth/signup/verify` | none | `{signup_token,code}` | `{access,refresh,role,user_id}` |
+| POST | `/auth/signup/resend-otp` | none | `{signup_token}` | `{ok}` |
+| POST | `/auth/doctor/apply` | none | doctor application payload | `{access,refresh,role,user_id,verified,pending}` |
+| POST | `/auth/login/password` | none | `{identifier,password}` | `{access,refresh,role,user_id}` |
+| POST | `/auth/login/otp/request` | none | `{phone}` | `{ok,dev_hint?}` |
+| POST | `/auth/login/otp/verify` | none | `{phone,code,full_name?}` | `{access,refresh,role,user_id}` |
+| POST | `/auth/password/reset/start` | none | `{email_or_phone}` | `{ok,reset_token}` |
+| POST | `/auth/password/reset/confirm` | none | `{reset_token,code,new_password}` | `{access,refresh,role,user_id}` |
 | POST | `/auth/refresh` | none | `{refresh}` | `{access}` |
 | POST | `/auth/logout` | bearer | — | `{ok}` |
 | **Documents** | | | | |
@@ -39,6 +46,7 @@ Auth via `Authorization: Bearer <jwt>` header. JWT access tokens 1h, refresh 30d
 | **Profile** | | | | |
 | GET | `/me` | patient | — | profile |
 | PATCH | `/me` | patient | partial fields | profile |
+| GET | `/me/dashboard` | patient | — | dashboard aggregate |
 | GET | `/me/timeline` | patient | — | chronological events (docs + analyses + reviews) |
 | GET | `/me/access-log` | patient | — | doctor view log |
 | DELETE | `/me` | patient | — | 204 (DPA 2023 deletion) |
@@ -51,6 +59,8 @@ Auth via `Authorization: Bearer <jwt>` header. JWT access tokens 1h, refresh 30d
 | GET | `/verifications` | patient | — | own list |
 | GET | `/verifications/{id}` | patient or doctor | — | one |
 | **Doctor portal** | | | | |
+| GET | `/doctor/status` | doctor | — | verified/pending status |
+| GET | `/doctor/dashboard` | doctor | — | dashboard aggregate |
 | GET | `/doctor/inbox` | doctor | — | paid pending requests |
 | GET | `/doctor/cases/{request_id}` | doctor (assigned) | — | case view incl. AI summary (consent-gated; writes access log) |
 | POST | `/doctor/cases/{request_id}/review` | doctor (assigned) | `{disposition,ai_claims_eval,doctor_notes_bn}` | `{review_id,submitted_at}` |
@@ -59,7 +69,7 @@ Auth via `Authorization: Bearer <jwt>` header. JWT access tokens 1h, refresh 30d
 | GET | `/doctors/{id}` | bearer | — | full profile + reviews |
 | POST | `/doctors/{id}/reviews` | patient (verified consult) | `{verification_id,rating,text?}` | `{id}` |
 | **Chamber** | | | | |
-| POST | `/chamber/session` | doctor | `{chamber_address?}` | session + QR token + `niro://chamber/<token>` payload |
+| POST | `/chamber/session` | verified doctor | `{chamber_address?}` | session + QR token + `niro://chamber/<token>` payload |
 | POST | `/chamber/session/{qr_token}/scan` | patient | `{scope,expires_in_hours}` | session (now bound) |
 | GET | `/chamber/session/{session_id}` | doctor or bound patient | — | session state (poll for `bound_at`) |
 | GET | `/chamber/session/{session_id}/profile` | doctor (bound, consent) | — | patient profile snapshot incl. timeline + latest analysis |
@@ -70,12 +80,12 @@ Auth via `Authorization: Bearer <jwt>` header. JWT access tokens 1h, refresh 30d
 
 ### 1. Sign in as patient
 ```bash
-curl -X POST http://localhost:8000/api/v1/auth/otp/request \
+curl -X POST http://localhost:8000/api/v1/auth/login/otp/request \
   -H "Content-Type: application/json" \
   -d '{"phone":"+8801711000005"}'
 # Returns dev_hint with "dev OTP is 123456"
 
-ACCESS=$(curl -s -X POST http://localhost:8000/api/v1/auth/otp/verify \
+ACCESS=$(curl -s -X POST http://localhost:8000/api/v1/auth/login/otp/verify \
   -H "Content-Type: application/json" \
   -d '{"phone":"+8801711000005","code":"123456","full_name":"রহিমা বেগম"}' \
   | jq -r .access)
@@ -116,9 +126,9 @@ curl -X POST "http://localhost:8000/api/v1/verifications/$REQ/pay" \
 ### 5. Doctor reviews
 ```bash
 # Sign in as Dr. Mahmudul Hasan (seeded; phone "+88017000DOCTR1")
-DOC_TOK=$(curl -s -X POST http://localhost:8000/api/v1/auth/otp/request \
+DOC_TOK=$(curl -s -X POST http://localhost:8000/api/v1/auth/login/otp/request \
   -H "Content-Type: application/json" -d '{"phone":"+88017000DOCTR1"}' >/dev/null \
-  && curl -s -X POST http://localhost:8000/api/v1/auth/otp/verify \
+  && curl -s -X POST http://localhost:8000/api/v1/auth/login/otp/verify \
   -H "Content-Type: application/json" \
   -d '{"phone":"+88017000DOCTR1","code":"123456"}' | jq -r .access)
 

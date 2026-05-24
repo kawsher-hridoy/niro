@@ -11,7 +11,7 @@ or post-ICADHI.
 
 ## M-1 — OTP code is always `123456`
 
-- **Where:** `POST /auth/otp/verify` accepts `123456` for any phone.
+- **Where:** `POST /auth/login/otp/verify` accepts `123456` for legacy OTP login; signup and reset OTPs use the same dev code path.
 - **Why:** Real SMS providers (SSL Wireless, BulkSMSBD) need a contract
   and account setup we don't have time for.
 - **Demo story:** "In production this is sent via SMS; for the demo
@@ -36,10 +36,12 @@ or post-ICADHI.
   consistent. In the live final we'll show the real sandbox if it
   cooperates."
 
-## M-3 — BMDC verification is admin-seeded, not API-verified
+## M-3 — BMDC verification is seeded or dev-auto-verified, not API-verified
 
 - **Where:** 6 doctor profiles are seeded with `verified=true` and a
-  fake BMDC number. No actual lookup against the BMDC registry.
+  fake BMDC number. New doctor applications through `/auth/doctor/apply`
+  are auto-verified when `APP_ENV != "prod"`; production keeps them
+  pending for manual/BMDC review. No actual lookup against the BMDC registry.
 - **Why:** Phase 1 has no time for real integration; the BMDC public
   registry has rate limits and inconsistent uptime.
 - **Demo story:** "Doctors are BMDC-verified; in production we cross-check
@@ -136,7 +138,7 @@ or post-ICADHI.
 |---|---|---|
 | M-1 | OTP `123456` | Post-ICADHI |
 | M-2 | bKash auto-pay | 1 June (or keep) |
-| M-3 | BMDC seeded | 31 May |
+| M-3 | BMDC seeded / dev auto-verified | 31 May |
 | M-4 | Canned doctor review | 15 June (real friend) |
 | M-5 | No device binding | 7 June |
 | M-6 | No notifications | Post-launch |

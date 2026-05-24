@@ -1,10 +1,9 @@
 # Frontend — Components & Pages Inventory
 
-Actual inventory as built through Phase D + Fix #1. **14 pages, 0 extracted
-components** (landing-page subcomponents live inline in `app/page.tsx`;
-candidates for extraction tracked under "Phase F polish targets" below).
+Actual inventory as built through Day-5 Fix #4. App-shell components are now extracted.
 
-## Pages (14)
+
+## Pages (20 URL-visible)
 
 ### Public
 
@@ -12,26 +11,28 @@ candidates for extraction tracked under "Phase F polish targets" below).
 |---|---|
 | `/` | `app/page.tsx` (server) — post-Fix-#1: 6-section marketing landing. Subcomponents inline: `SiteNav`, `Hero`, `PhoneMockup`, `TrustStrip`, `Stat`, `Features`, `FeatureCard`, `HowItWorks`, `Step`, `FinalCTA`, `SiteFooter`. |
 
-### Auth (2)
+### Auth (4)
 
 | Path | File | Notes |
 |---|---|---|
-| `/signin` | `app/signin/page.tsx` | phone entry, calls `/auth/otp/request` |
-| `/verify` | `app/verify/page.tsx` | OTP entry, calls `/auth/otp/verify`, saves session to localStorage |
+| `/signin` | `app/signin/page.tsx` | patient sign in/sign up + doctor application tabs |
+| `/signin/otp` | `app/signin/otp/page.tsx` | legacy phone OTP entry path |
+| `/verify` | `app/verify/page.tsx` | OTP entry for signup/reset/legacy OTP, saves session to localStorage |
+| `/forgot-password` | `app/forgot-password/page.tsx` | password reset request surface |
 
-### Patient (8)
+### Patient (9)
 
 | Path | File | Notes |
 |---|---|---|
-| `/home` | `app/home/page.tsx` | dashboard with upload CTA, doc list, nav chips |
-| `/upload` | `app/upload/page.tsx` | file picker + kind selector → upload → analyze chain; supports `?document=<id>` re-analyze |
-| `/analyses/[id]` | `app/analyses/[id]/page.tsx` | Bangla result + red flags + meds table + lab values + 🖨 PDF; uses `use(params)` for Next 16 async params |
-| `/timeline` | `app/timeline/page.tsx` | chronological events |
-| `/doctors` | `app/doctors/page.tsx` | directory with specialty + tier + name filters |
-| `/doctors/[id]` | `app/doctors/[id]/page.tsx` | profile + qualifications + chambers + reviews + "request verification" panel |
-| `/verifications` | `app/verifications/page.tsx` | own list with status chips |
-| `/verifications/[id]` | `app/verifications/[id]/page.tsx` | detail + mock-pay + auto-poll for review |
-| `/access-log` | `app/access-log/page.tsx` | patient-visible doctor access log |
+| `/home` | `app/(app)/home/page.tsx` | patient SaaS dashboard inside authenticated shell |
+| `/upload` | `app/(app)/upload/page.tsx` | file picker + kind selector → upload → analyze chain; supports `?document=<id>` re-analyze |
+| `/analyses/[id]` | `app/(app)/analyses/[id]/page.tsx` | Bangla result + red flags + meds table + lab values + 🖨 PDF; uses `use(params)` for Next 16 async params |
+| `/timeline` | `app/(app)/timeline/page.tsx` | chronological events |
+| `/doctors` | `app/(app)/doctors/page.tsx` | directory with specialty + tier + name filters |
+| `/doctors/[id]` | `app/(app)/doctors/[id]/page.tsx` | profile + qualifications + chambers + reviews + "request verification" panel |
+| `/verifications` | `app/(app)/verifications/page.tsx` | own list with status chips |
+| `/verifications/[id]` | `app/(app)/verifications/[id]/page.tsx` | detail + mock-pay + auto-poll for review |
+| `/access-log` | `app/(app)/access-log/page.tsx` | patient-visible doctor access log |
 
 ### Chamber (patient side, 2)
 
@@ -40,17 +41,19 @@ candidates for extraction tracked under "Phase F polish targets" below).
 | `/chamber/scan` | `app/chamber/scan/page.tsx` | camera scanner via `html5-qrcode` + manual fallback |
 | `/chamber/[token]` | `app/chamber/[token]/page.tsx` | consent dialog (scope picker + duration slider) → POST `/chamber/session/{token}/scan` |
 
-### Doctor portal (3)
+### Doctor portal (5)
 
 | Path | File | Notes |
 |---|---|---|
-| `/doctor-portal/inbox` | `app/doctor-portal/inbox/page.tsx` | Pending / Done split |
-| `/doctor-portal/cases/[id]` | `app/doctor-portal/cases/[id]/page.tsx` | AI case-summary + target analysis + history + review form |
-| `/doctor-portal/chamber` | `app/doctor-portal/chamber/page.tsx` | 4-phase state machine: init → waiting (QR + 2s poll) → bound → closed |
+| `/doctor-portal/pending` | `app/doctor-portal/pending/page.tsx` | pending-review page for unverified doctors |
+| `/doctor-portal/dashboard` | `app/(doctor)/doctor-portal/dashboard/page.tsx` | verified doctor dashboard |
+| `/doctor-portal/inbox` | `app/(doctor)/doctor-portal/inbox/page.tsx` | Pending / Done split |
+| `/doctor-portal/cases/[id]` | `app/(doctor)/doctor-portal/cases/[id]/page.tsx` | AI case-summary + target analysis + history + review form |
+| `/doctor-portal/chamber` | `app/(doctor)/doctor-portal/chamber/page.tsx` | 4-phase state machine: init → waiting (QR + 2s poll) → bound → closed |
 
-## Components (0 extracted)
+## Components
 
-`src/components/` is empty as of Fix #1. The previous global
+`src/components/` now contains the reusable app shell and `EmptyState`. The previous global
 `DisclaimerBanner` was removed (D-011); disclaimer copy now appears
 inline on AI-output pages instead of as a global banner.
 
@@ -100,6 +103,7 @@ All API response shapes live in `lib/api.ts`:
 | `VerificationOut` | `verifications`, `verifications/[id]` |
 | `CaseView` | `doctor-portal/cases/[id]` |
 | `ChamberSessionOut`, `ChamberProfileOut` | `doctor-portal/chamber`, `chamber/[token]` |
+| `DashboardOut`, `DoctorDashboardOut`, `DoctorStatusOut`, `DoctorApplyOut` | shell/dashboard/auth flows |
 
 ## Print stylesheet (PDF export)
 
@@ -109,6 +113,7 @@ All API response shapes live in `lib/api.ts`:
 ## Phase F polish targets
 
 - Component extraction (`ConfidenceBadge`, `RedFlagChip`, `StatusChip`, `Card`).
+- App-shell extraction remains in `src/components/app-shell/` and is now part of the baseline.
 - shadcn/ui for `Dialog` / `Toast` / `DropdownMenu`.
 - Skeleton loaders (currently raw "লোড হচ্ছে...").
 - Better empty states with illustrations.

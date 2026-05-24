@@ -15,7 +15,10 @@ on-demand doctor verification platform for Bangladesh. Submitted to
 Phase 1 build is **feature-complete** as of 23 May 2026. The current
 work is **iterative issue fixes** (Day 5 in `docs/build-log.md`, driven
 by the user — branch per issue, squash-merge after approval) until
-27 May submission. Live-demo polish (post-30 May if shortlisted) follows.
+27 May submission. Day-5 fixes now include the marketing landing,
+password auth, the authenticated app shell, patient dashboard, doctor
+onboarding, and the verified-doctor dashboard. Live-demo polish
+(post-30 May if shortlisted) follows.
 
 ---
 
@@ -61,13 +64,13 @@ by the user — branch per issue, squash-merge after approval) until
 backend/
   ai/          provider abstraction + Azure impl + Bangla prompts + policy linter
   services/    audit, consent, storage, JWT auth
-  api/routers/ 29 endpoints across 9 modules
-  db/          11 SQLAlchemy models + 3 Alembic migrations
-  seeds/       6 BMDC-verified doctors
+  api/routers/ 39 router endpoints across 9 modules (+ /health)
+  db/          14 SQLAlchemy models + 4 Alembic migrations
+  seeds/       6 seeded BMDC-verified doctors
 frontend/
-  src/app/             14 pages across patient + doctor portal + chamber; `app/page.tsx` is the post-Fix-#1 marketing landing (6 sections, all subcomponents inline)
-  src/components/      empty (DisclaimerBanner deleted in Fix #1 — see D-011; page-local subcomponents live inline in their page.tsx)
-  src/lib/             api.ts (typed fetch + all response types) + i18n.ts (Bangla helpers)
+  src/app/             Next route groups: (app) patient shell, (doctor) verified doctor shell, plus public auth/chamber pages
+  src/components/      EmptyState + app-shell components (AppShellGate, AppShell, Sidebar, Topbar)
+  src/lib/             api.ts (typed fetch + all response types/session helpers) + i18n.ts (Bangla helpers)
 ```
 
 The detailed map is in `CLAUDE.md` "Repo layout".
@@ -83,6 +86,8 @@ The detailed map is in `CLAUDE.md` "Repo layout".
 - **Frontend dir is `niro/frontend/`, not `frontend/`** — `mkdir frontend/...` from the wrong cwd creates a sibling repo.
 - **`DisclaimerBanner` no longer exists** — deleted in Fix #1 (D-011). Don't import it. Inline AI disclaimer copy on result pages instead.
 - **Don't recreate `prefers-color-scheme: dark`** — Phase 1 is light-mode only (D-011).
+- **Authenticated routes live in route groups.** Patient pages are under `niro/frontend/src/app/(app)/`; verified doctor pages are under `niro/frontend/src/app/(doctor)/`. Route groups do not change URLs.
+- **Doctor demo accounts are verified in dev.** New doctor applications auto-verify when `APP_ENV != "prod"`; production keeps them pending until BMDC/admin verification.
 - **Don't commit fixes to `main` directly during the issue-fix loop** — branch per issue, squash-merge after user approval. See CLAUDE.md "Issue-fix workflow".
 
 ---

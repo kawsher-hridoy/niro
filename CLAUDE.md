@@ -32,6 +32,9 @@ Generic-agent guidance: `AGENTS.md` (this complements that file).
 **Phase 1 build is feature-complete on `main`.** When picking up a new
 session: read `docs/build-log.md` Day 4 entry first, then Day 5 (issue
 fixes loop, currently active — see "Issue-fix workflow" section below).
+Day-5 fixes already shipped the public landing rebuild, SaaS auth, the
+authenticated patient shell/dashboard, and the doctor onboarding +
+verified-doctor dashboard.
 
 ---
 
@@ -45,7 +48,7 @@ fixes loop, currently active — see "Issue-fix workflow" section below).
 | AI provider | Azure OpenAI `gpt-chat-latest` (Preview, retires 5 Aug 2026)                                     | Endpoint `https://ai-for-security.services.ai.azure.com/openai/v1`. **Use `Authorization: Bearer ...` header, not `api-key:`** |
 | DB          | `postgres:16.3-alpine3.20` (cached locally — see D-007)                                          | pgvector deferred; Phase 1 has no vector queries                                                                               |
 | Frontend    | **Next.js 16.2.6** (App Router, Turbopack default), React 19.2, Tailwind 4                       | See "Next.js 16 gotchas" below                                                                                                 |
-| Auth        | Phone OTP (mock `123456` in dev), JWT HS256                                                      | OTP storage: sha256(salt:code) — see D-009                                                                                     |
+| Auth        | Patient signup/password login/reset + legacy OTP, doctor application + OTP for seeded doctors, JWT HS256 | Passwords use Argon2id (D-012); OTP storage uses sha256(salt:code) (D-009). Dev doctor applications auto-verify when `APP_ENV != "prod"` |
 | Hosting     | Local dev now, single VPS later (Caddy + systemd)                                                | Phase F4                                                                                                                       |
 
 ---
@@ -159,13 +162,13 @@ single switch point.
     ├── sample_rx.png, sample_lab.png
     ├── backend/                  # FastAPI service
     │   ├── pyproject.toml
-    │   ├── main.py               # app, structlog, CORS, all 29 routes wired
+    │   ├── main.py               # app, structlog, CORS, all routers wired
     │   ├── config.py             # pydantic-settings, reads ../.env
     │   ├── db/
     │   │   ├── base.py
     │   │   ├── session.py        # sync engine + SessionLocal + get_db
-    │   │   ├── models.py         # 11 tables
-    │   │   └── migrations/       # 0001_init, 0002_phase_b, 0003_phase_c
+    │   │   ├── models.py         # current SQLAlchemy models
+    │   │   └── migrations/       # revisions through 0004_email_password_auth
     │   ├── ai/
     │   │   ├── provider.py       # AIProvider ABC + factory
     │   │   ├── azure.py          # AzureOpenAIProvider concrete impl
@@ -175,15 +178,15 @@ single switch point.
     │   │   ├── audit.py          # AuditWriter (append-only)
     │   │   ├── consent.py        # ConsentGuard.require + record_access
     │   │   ├── storage.py        # local blob writer with sha256
-    │   │   └── auth.py           # JWT, current_user, role-gating deps
+    │   │   └── auth.py           # JWT, password hashing, current_user, role/verified-doctor deps
     │   ├── api/routers/
-    │   │   ├── auth.py           # OTP request/verify/refresh/logout
+    │   │   ├── auth.py           # signup, password login/reset, doctor apply, OTP, refresh/logout
     │   │   ├── documents.py      # upload, list, get, delete
     │   │   ├── analyses.py       # AI analyze (history-aware) + list + get
-    │   │   ├── profile.py        # /me, /timeline, /access-log, DELETE /me
+    │   │   ├── profile.py        # /me, /me/dashboard, /timeline, /access-log, DELETE /me
     │   │   ├── consent.py        # grant, revoke
     │   │   ├── verifications.py  # request, mock-pay, list, get
-    │   │   ├── doctor.py         # inbox, case view (consent-gated), submit review
+    │   │   ├── doctor.py         # status, dashboard, inbox, case view (consent-gated), submit review
     │   │   ├── doctors.py        # public directory + reviews
     │   │   └── chamber.py        # session lifecycle: open, scan, profile, prescription, close
     │   ├── seeds/doctors.py      # 6 BMDC-verified seed
@@ -195,17 +198,20 @@ single switch point.
         └── src/
             ├── app/
             │   ├── layout.tsx, globals.css (print stylesheet), page.tsx (marketing landing — Fix #1)
-            │   ├── signin/, verify/
-            │   ├── home/, upload/, timeline/, access-log/
-            │   ├── analyses/[id]/ (with 🖨 PDF via window.print)
-            │   ├── doctors/, doctors/[id]/
-            │   ├── verifications/, verifications/[id]/ (auto-poll)
+            │   ├── signin/, signin/otp/, verify/, forgot-password/
+            │   ├── (app)/layout.tsx                    # patient authenticated shell
+            │   ├── (app)/home/, upload/, timeline/, access-log/
+            │   ├── (app)/analyses/[id]/ (with PDF via window.print)
+            │   ├── (app)/doctors/, (app)/doctors/[id]/
+            │   ├── (app)/verifications/, (app)/verifications/[id]/ (auto-poll)
             │   ├── chamber/scan/, chamber/[token]/
-            │   └── doctor-portal/
+            │   ├── doctor-portal/pending/              # unverified doctor state
+            │   └── (doctor)/doctor-portal/             # verified doctor shell
+            │       ├── dashboard/
             │       ├── inbox/
             │       ├── cases/[id]/
             │       └── chamber/    # QR + 2s polling state machine
-            ├── components/        # empty as of Fix #1 (DisclaimerBanner deleted; landing page-local subcomponents live inline in page.tsx)
+            ├── components/        # EmptyState + app-shell components
             └── lib/
                 ├── api.ts          # typed fetch wrapper + all response types
                 └── i18n.ts         # toBangla, timeAgoBn
@@ -219,7 +225,7 @@ single switch point.
 | --------- | ----------------------------------------------------------------------------- | --------------------------------------- |
 | **D-001** | Submit to ICADHI Track 1 (Telemedicine)                                       | ICADHI portal, all demo docs            |
 | **D-002** | Keep DESIGN.md intact, add docs/ folder alongside                             | This file structure                     |
-| **D-003** | FastAPI + Next.js 15 (now 16) + Postgres + pgvector                           | All code                                |
+| **D-003** | FastAPI + Next.js 16 + Postgres; pgvector deferred                           | All code                                |
 | **D-004** | Azure OpenAI `gpt-chat-latest` as primary                                     | `.env`, `backend/ai/azure.py`           |
 | **D-005** | Project name = Niro                                                           | Everywhere                              |
 | **D-006** | Phase A docs-skeleton-first                                                   | Done                                    |
@@ -228,6 +234,7 @@ single switch point.
 | **D-009** | OTP storage: `sha256(salt:code)` (not bcrypt) — passlib + bcrypt 5.x incompat | `backend/api/routers/auth.py`           |
 | **D-010** | PDF "export" via browser print stylesheet (not WeasyPrint)                    | `globals.css`, `analyses/[id]/page.tsx` |
 | **D-011** | Landing `/` is a full marketing site (6 sections, light-mode only, no global disclaimer banner) | `app/page.tsx`, `app/globals.css`, `app/layout.tsx` |
+| **D-012** | Password hashing via Argon2id (`argon2-cffi`) | `services/auth.py`, `routers/auth.py`, migration `0004` |
 
 See `docs/decisions.md` for rationale + alternatives on each.
 
@@ -256,6 +263,7 @@ See `docs/decisions.md` for rationale + alternatives on each.
 - Default consent expiry: 24h (verification flow) / 2h (chamber flow).
 - Every doctor view logged via `consent.record_access()` → both `access_logs` (patient-visible) and `audit_log` (forensic).
 - Patient can delete all their data via `DELETE /api/v1/me` (DPA 2023 compliant).
+- Doctor portal patient-data routes use `require_verified_doctor`; pending doctors can only see `/doctor-portal/pending` and `/doctor/status`.
 
 ### Bangla-first
 
@@ -341,12 +349,13 @@ The full workflow plan lives at `/home/l0minex/.claude/plans/twinkly-inventing-p
 - Don't write multi-paragraph docstrings or comment blocks. One line max.
 - Don't use Next.js 14/15 patterns (sync `params`, `next lint`, `middleware.ts`).
 - Don't use `tailwind.config.ts` — Tailwind 4 uses `@theme inline`.
-- Don't reach for bcrypt for short-lived secrets (D-009).
+- Don't reach for bcrypt for short-lived secrets (D-009), and don't replace Argon2id for user passwords (D-012).
 - Don't try to use `images.domains` (deprecated in Next 16).
 - Don't pull `pgvector/pgvector:pg16` blindly — Docker Hub IPv6 is broken on this network (D-007).
 - **Don't recreate `DisclaimerBanner`** — deleted in Fix #1 (D-011). If you need to add a disclaimer on an AI-output page, render it inline at the top of that page.
 - **Don't reintroduce dark mode** for Phase 1 — the `prefers-color-scheme: dark` override was removed in Fix #1 (D-011). Light-mode only until explicitly reopened.
 - **Don't commit a fix directly to `main`** — use the issue-fix workflow above (branch per issue → squash-merge after user approval).
+- **Don't put authenticated patient/doctor pages back at top-level routes** — keep patient pages under `(app)` and verified doctor pages under `(doctor)`. Route groups preserve URLs.
 
 ---
 
