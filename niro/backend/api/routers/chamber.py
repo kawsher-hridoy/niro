@@ -26,7 +26,7 @@ from backend.db.models import (
 )
 from backend.db.session import get_db
 from backend.services import audit, storage
-from backend.services.auth import current_user, require_doctor, require_patient
+from backend.services.auth import current_user, require_patient, require_verified_doctor
 from backend.services.consent import find_active_consent, record_access
 
 
@@ -59,7 +59,7 @@ class OpenIn(BaseModel):
 def open_session(
     body: OpenIn,
     db: Session = Depends(get_db),
-    user: User = Depends(require_doctor),
+    user: User = Depends(require_verified_doctor),
 ) -> SessionOut:
     token = secrets.token_urlsafe(24)
     expires = datetime.now(timezone.utc) + _DEFAULT_SESSION_TTL
@@ -182,7 +182,7 @@ def get_session(
 def get_profile(
     session_id: uuid.UUID,
     db: Session = Depends(get_db),
-    user: User = Depends(require_doctor),
+    user: User = Depends(require_verified_doctor),
 ) -> ProfileSnapshotOut:
     sess = db.get(ChamberSession, session_id)
     if sess is None or sess.doctor_id != user.id:
@@ -271,7 +271,7 @@ async def write_prescription(
     file: UploadFile = File(...),
     kind: str = Form("prescription"),
     db: Session = Depends(get_db),
-    user: User = Depends(require_doctor),
+    user: User = Depends(require_verified_doctor),
 ) -> dict:
     sess = db.get(ChamberSession, session_id)
     if sess is None or sess.doctor_id != user.id:

@@ -62,6 +62,8 @@ export type Session = {
   refresh: string;
   role: "patient" | "doctor" | "admin";
   user_id: string;
+  verified?: boolean;
+  pending?: boolean;
 };
 
 function cookieSuffix(): string {
@@ -198,6 +200,19 @@ export type ResetStartOut = {
 };
 export type ResetConfirmIn = { phone: string; code: string; new_password: string };
 export type OtpRequestOut = { ok: boolean; dev_hint?: string | null };
+export type DoctorApplyIn = SignupStartIn & {
+  bmdc_number: string;
+  specialties: string[];
+  chamber_name: string;
+  chamber_address?: string;
+  chamber_hours?: string;
+  bio?: string;
+  fee_tier: number;
+};
+export type DoctorApplyOut = Session & {
+  verified: boolean;
+  pending: boolean;
+};
 
 export const authApi = {
   signupStart: (body: SignupStartIn) =>
@@ -206,6 +221,8 @@ export const authApi = {
     apiPost<Session>("/auth/signup/verify", body, { auth: false }),
   signupResendOtp: (signup_token: string) =>
     apiPost<SignupResendOut>("/auth/signup/resend-otp", { signup_token }, { auth: false }),
+  doctorApply: (body: DoctorApplyIn) =>
+    apiPost<DoctorApplyOut>("/auth/doctor/apply", body, { auth: false }),
   loginPassword: (body: PasswordLoginIn) =>
     apiPost<Session>("/auth/login/password", body, { auth: false }),
   loginOtpRequest: (phone: string) =>
@@ -234,6 +251,8 @@ export type MeOut = {
   sex?: string | null;
   allergies?: unknown[];
   conditions?: unknown[];
+  doctor_verified?: boolean | null;
+  doctor_bmdc_number?: string | null;
 };
 
 export type DocumentOut = {
@@ -348,6 +367,49 @@ export type DashboardOut = {
 export function getDashboard(): Promise<DashboardOut> {
   return apiGet<DashboardOut>("/me/dashboard");
 }
+
+
+export type DoctorStatusOut = {
+  verified: boolean;
+  bmdc_number: string | null;
+  specialties: string[];
+  fee_tier: number | null;
+};
+
+export type DoctorDashboardOut = {
+  user: { id: string; full_name: string; phone: string };
+  profile: DoctorStatusOut;
+  counts: {
+    pending_reviews: number;
+    due_soon: number;
+    completed_today: number;
+    active_chamber_sessions: number;
+    recent_patient_access: number;
+  };
+  urgent_reviews: Array<{
+    request_id: string;
+    patient_name: string;
+    document_kind: string;
+    fee_bdt: number;
+    created_at: string;
+    due_by: string;
+    has_review: boolean;
+  }>;
+  completed_reviews: Array<{
+    request_id: string;
+    patient_name: string;
+    disposition: "agree" | "concerns" | "escalate" | string;
+    submitted_at: string;
+  }>;
+  recent_access: Array<{
+    patient_name: string | null;
+    screen: string;
+    viewed_at: string;
+    context: "async" | "chamber";
+  }>;
+  rating_avg: number | null;
+  rating_count: number;
+};
 
 export type DoctorCard = {
   id: string;

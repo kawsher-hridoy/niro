@@ -6,12 +6,12 @@ is called inside every case-fetching route.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import desc, select
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
 from backend.ai.provider import get_provider
@@ -22,15 +22,206 @@ from backend.db.models import (
     User,
     VerificationRequest,
     VerificationReview,
+    ChamberSession,
+    AccessLog,
+    DoctorReview,
 )
 from backend.db.session import get_db
 from backend.services import audit
-from backend.services.auth import require_doctor
+from backend.services.auth import require_doctor, require_verified_doctor
 from backend.services.consent import PermissionDenied, find_active_consent, record_access
 
 
 router = APIRouter(prefix="/doctor", tags=["doctor-portal"])
 
+
+
+
+class DoctorProfileStatusOut(BaseModel):
+    verified: bool
+    bmdc_number: str | None = None
+    specialties: list[str] = []
+    fee_tier: int | None = None
+
+
+class DoctorDashboardCountsOut(BaseModel):
+    pending_reviews: int
+    due_soon: int
+    completed_today: int
+    active_chamber_sessions: int
+    recent_patient_access: int
+
+
+class DoctorDashboardInboxItem(BaseModel):
+    request_id: str
+    patient_name: str
+    document_kind: str
+    fee_bdt: int
+    created_at: datetime
+    due_by: datetime
+    has_review: bool
+
+
+class DoctorDashboardReviewOut(BaseModel):
+    request_id: str
+    patient_name: str
+    disposition: str
+    submitted_at: datetime
+
+
+class DoctorDashboardAccessOut(BaseModel):
+    patient_name: str | None
+    screen: str
+    viewed_at: datetime
+    context: Literal["async", "chamber"]
+
+
+class DoctorDashboardOut(BaseModel):
+    user: dict
+    profile: DoctorProfileStatusOut
+    counts: DoctorDashboardCountsOut
+    urgent_reviews: list[DoctorDashboardInboxItem]
+    completed_reviews: list[DoctorDashboardReviewOut]
+    recent_access: list[DoctorDashboardAccessOut]
+    rating_avg: float | None = None
+    rating_count: int = 0
+
+
+@router.get("/status", response_model=DoctorProfileStatusOut)
+def status_me(
+    db: Session = Depends(get_db), user: User = Depends(require_doctor)
+) -> DoctorProfileStatusOut:
+    profile = db.get(DoctorProfile, user.id)
+    return DoctorProfileStatusOut(
+        verified=bool(profile and profile.verified),
+        bmdc_number=profile.bmdc_number if profile else None,
+        specialties=list(profile.specialties or []) if profile else [],
+        fee_tier=profile.fee_tier if profile else None,
+    )
+
+
+@router.get("/dashboard", response_model=DoctorDashboardOut)
+def dashboard(
+    db: Session = Depends(get_db), user: User = Depends(require_verified_doctor)
+) -> DoctorDashboardOut:
+    profile = db.get(DoctorProfile, user.id)
+    assert profile is not None
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    due_limit = now + timedelta(hours=24)
+
+    pending_reviews = db.execute(
+        select(func.count(VerificationRequest.id))
+        .outerjoin(VerificationReview, VerificationReview.request_id == VerificationRequest.id)
+        .where(VerificationRequest.doctor_id == user.id)
+        .where(VerificationRequest.payment_status == "paid")
+        .where(VerificationReview.id.is_(None))
+    ).scalar_one()
+    due_soon = db.execute(
+        select(func.count(VerificationRequest.id))
+        .outerjoin(VerificationReview, VerificationReview.request_id == VerificationRequest.id)
+        .where(VerificationRequest.doctor_id == user.id)
+        .where(VerificationRequest.payment_status == "paid")
+        .where(VerificationReview.id.is_(None))
+        .where(VerificationRequest.due_by <= due_limit)
+    ).scalar_one()
+    completed_today = db.execute(
+        select(func.count(VerificationReview.id))
+        .where(VerificationReview.doctor_id == user.id)
+        .where(VerificationReview.submitted_at >= today_start)
+    ).scalar_one()
+    active_chambers = db.execute(
+        select(func.count(ChamberSession.id))
+        .where(ChamberSession.doctor_id == user.id)
+        .where(ChamberSession.closed_at.is_(None))
+        .where(ChamberSession.expires_at > now)
+    ).scalar_one()
+    recent_patient_access = db.execute(
+        select(func.count(AccessLog.id))
+        .where(AccessLog.doctor_id == user.id)
+        .where(AccessLog.viewed_at >= now - timedelta(days=7))
+    ).scalar_one()
+
+    urgent_rows = db.execute(
+        select(VerificationRequest, User.full_name, Document.kind, VerificationReview.id)
+        .join(User, User.id == VerificationRequest.patient_id)
+        .join(Document, Document.id == VerificationRequest.document_id)
+        .outerjoin(VerificationReview, VerificationReview.request_id == VerificationRequest.id)
+        .where(VerificationRequest.doctor_id == user.id)
+        .where(VerificationRequest.payment_status == "paid")
+        .where(VerificationReview.id.is_(None))
+        .order_by(VerificationRequest.due_by, desc(VerificationRequest.created_at))
+        .limit(5)
+    ).all()
+    completed_rows = db.execute(
+        select(VerificationRequest, VerificationReview, User.full_name)
+        .join(VerificationReview, VerificationReview.request_id == VerificationRequest.id)
+        .join(User, User.id == VerificationRequest.patient_id)
+        .where(VerificationReview.doctor_id == user.id)
+        .order_by(desc(VerificationReview.submitted_at))
+        .limit(4)
+    ).all()
+    access_rows = db.execute(
+        select(AccessLog, User.full_name)
+        .join(User, User.id == AccessLog.patient_id)
+        .where(AccessLog.doctor_id == user.id)
+        .order_by(desc(AccessLog.viewed_at))
+        .limit(4)
+    ).all()
+    rating_avg, rating_count = db.execute(
+        select(func.avg(DoctorReview.rating), func.count(DoctorReview.id))
+        .where(DoctorReview.doctor_id == user.id)
+        .where(DoctorReview.hidden == False)  # noqa: E712
+    ).one()
+
+    return DoctorDashboardOut(
+        user={"id": str(user.id), "full_name": user.full_name, "phone": user.phone},
+        profile=DoctorProfileStatusOut(
+            verified=profile.verified,
+            bmdc_number=profile.bmdc_number,
+            specialties=list(profile.specialties or []),
+            fee_tier=profile.fee_tier,
+        ),
+        counts=DoctorDashboardCountsOut(
+            pending_reviews=int(pending_reviews or 0),
+            due_soon=int(due_soon or 0),
+            completed_today=int(completed_today or 0),
+            active_chamber_sessions=int(active_chambers or 0),
+            recent_patient_access=int(recent_patient_access or 0),
+        ),
+        urgent_reviews=[
+            DoctorDashboardInboxItem(
+                request_id=str(req.id),
+                patient_name=patient_name,
+                document_kind=kind,
+                fee_bdt=req.fee_bdt,
+                created_at=req.created_at,
+                due_by=req.due_by,
+                has_review=review_id is not None,
+            )
+            for req, patient_name, kind, review_id in urgent_rows
+        ],
+        completed_reviews=[
+            DoctorDashboardReviewOut(
+                request_id=str(req.id),
+                patient_name=patient_name,
+                disposition=review.disposition,
+                submitted_at=review.submitted_at,
+            )
+            for req, review, patient_name in completed_rows
+        ],
+        recent_access=[
+            DoctorDashboardAccessOut(
+                patient_name=patient_name,
+                screen=row.screen,
+                viewed_at=row.viewed_at,
+                context="chamber" if (row.location or "").startswith("chamber:") else "async",
+            )
+            for row, patient_name in access_rows
+        ],
+        rating_avg=float(rating_avg) if rating_avg is not None else None,
+        rating_count=int(rating_count or 0),
+    )
 
 class InboxItem(BaseModel):
     request_id: str
@@ -66,7 +257,7 @@ class ReviewIn(BaseModel):
 
 @router.get("/inbox", response_model=list[InboxItem])
 def inbox(
-    db: Session = Depends(get_db), user: User = Depends(require_doctor)
+    db: Session = Depends(get_db), user: User = Depends(require_verified_doctor)
 ) -> list[InboxItem]:
     rows = db.execute(
         select(VerificationRequest, User.full_name, Document.kind, VerificationReview.id)
@@ -99,7 +290,7 @@ def inbox(
 def get_case(
     request_id: uuid.UUID,
     db: Session = Depends(get_db),
-    user: User = Depends(require_doctor),
+    user: User = Depends(require_verified_doctor),
 ) -> CaseView:
     req = db.get(VerificationRequest, request_id)
     if req is None or req.doctor_id != user.id:
@@ -224,7 +415,7 @@ def submit_review(
     request_id: uuid.UUID,
     body: ReviewIn,
     db: Session = Depends(get_db),
-    user: User = Depends(require_doctor),
+    user: User = Depends(require_verified_doctor),
 ) -> dict:
     req = db.get(VerificationRequest, request_id)
     if req is None or req.doctor_id != user.id:

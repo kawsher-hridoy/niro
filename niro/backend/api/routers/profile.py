@@ -14,6 +14,7 @@ from backend.db.models import (
     Analysis,
     Consent,
     Document,
+    DoctorProfile,
     PatientProfile,
     User,
     VerificationRequest,
@@ -37,6 +38,8 @@ class MeOut(BaseModel):
     sex: str | None = None
     allergies: list = []
     conditions: list = []
+    doctor_verified: bool | None = None
+    doctor_bmdc_number: str | None = None
 
 
 class MePatchIn(BaseModel):
@@ -119,6 +122,7 @@ class DashboardOut(BaseModel):
 @router.get("/me", response_model=MeOut)
 def me(db: Session = Depends(get_db), user: User = Depends(current_user)) -> MeOut:
     pp = db.get(PatientProfile, user.id)
+    dp = db.get(DoctorProfile, user.id) if user.role == "doctor" else None
     return MeOut(
         user_id=str(user.id),
         role=user.role,
@@ -129,6 +133,8 @@ def me(db: Session = Depends(get_db), user: User = Depends(current_user)) -> MeO
         sex=pp.sex if pp else None,
         allergies=pp.allergies if pp else [],
         conditions=pp.conditions if pp else [],
+        doctor_verified=dp.verified if dp else None,
+        doctor_bmdc_number=dp.bmdc_number if dp else None,
     )
 
 

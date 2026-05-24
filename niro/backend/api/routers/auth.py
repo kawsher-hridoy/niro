@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field, StringConstraints, field_validator
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
-from backend.db.models import OtpCode, PatientProfile, PendingSignup, User
+from backend.db.models import DoctorProfile, OtpCode, PatientProfile, PendingSignup, User
 from backend.db.session import get_db
 from backend.services import audit
 from backend.services.auth import (
@@ -169,6 +169,37 @@ class SignupResendOut(BaseModel):
     expires_at: datetime
     resend_count: int
     otp: str | None = None
+
+
+class DoctorApplyIn(SignupStartIn):
+    bmdc_number: Annotated[str, StringConstraints(min_length=4, max_length=32, strip_whitespace=True)]
+    specialties: list[str] = Field(min_length=1, max_length=6)
+    chamber_name: Annotated[str, StringConstraints(min_length=2, max_length=120, strip_whitespace=True)]
+    chamber_address: Annotated[str, StringConstraints(max_length=180, strip_whitespace=True)] = ""
+    chamber_hours: Annotated[str, StringConstraints(max_length=80, strip_whitespace=True)] = ""
+    bio: Annotated[str, StringConstraints(max_length=500, strip_whitespace=True)] = ""
+    fee_tier: int = Field(default=1, ge=1, le=3)
+
+    @field_validator("specialties")
+    @classmethod
+    def _v_specialties(cls, v: list[str]) -> list[str]:
+        cleaned = []
+        for item in v:
+            slug = re.sub(r"[^a-z0-9_\-]", "", item.strip().lower())[:32]
+            if slug and slug not in cleaned:
+                cleaned.append(slug)
+        if not cleaned:
+            raise ValueError("at least one specialty is required")
+        return cleaned
+
+
+class DoctorApplyOut(BaseModel):
+    access: str
+    refresh: str
+    role: str
+    user_id: str
+    verified: bool
+    pending: bool
 
 
 def _validate_password_strength(password: str, confirm: str) -> dict[str, str] | None:
@@ -320,6 +351,84 @@ def signup_resend_otp(body: SignupResendIn, db: Session = Depends(get_db)) -> Si
         expires_at=row.expires_at,
         resend_count=row.resend_count,
         otp=otp_code if _is_dev() else None,
+    )
+
+
+@router.post("/doctor/apply", response_model=DoctorApplyOut, status_code=status.HTTP_201_CREATED)
+def doctor_apply(body: DoctorApplyIn, db: Session = Depends(get_db)) -> DoctorApplyOut:
+    errs = _validate_password_strength(body.password, body.confirm_password)
+    if errs:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            {"detail": "validation failed", "fields": errs},
+        )
+
+    field_errs: dict[str, str] = {}
+    if db.query(User).filter(User.phone == body.phone).first():
+        field_errs["phone"] = "এই ফোন নম্বরে ইতিমধ্যে একটি অ্যাকাউন্ট আছে"
+    if db.query(User).filter(User.email == body.email).first():
+        field_errs["email"] = "এই ইমেইলে ইতিমধ্যে একটি অ্যাকাউন্ট আছে"
+    if db.query(DoctorProfile).filter(DoctorProfile.bmdc_number == body.bmdc_number).first():
+        field_errs["bmdc_number"] = "এই BMDC নম্বর দিয়ে আবেদন করা হয়েছে"
+    if field_errs:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"detail": "duplicate account", "fields": field_errs},
+        )
+
+    now = _utcnow()
+    auto_verified = _is_dev()
+    user = User(
+        id=uuid.uuid4(),
+        role="doctor",
+        phone=body.phone,
+        email=body.email,
+        password_hash=hash_password(body.password),
+        full_name=body.full_name,
+        language="bn",
+        phone_verified_at=now,
+        last_login_at=now,
+    )
+    db.add(user)
+    db.flush()
+    db.add(
+        DoctorProfile(
+            user_id=user.id,
+            bmdc_number=body.bmdc_number,
+            qualifications=[],
+            specialties=body.specialties,
+            fee_tier=body.fee_tier,
+            chambers=[
+                {
+                    "name": body.chamber_name,
+                    "address": body.chamber_address or None,
+                    "hours": body.chamber_hours or None,
+                }
+            ],
+            verified=auto_verified,
+            bio=body.bio or None,
+        )
+    )
+    audit.record(
+        db,
+        "auth.doctor.application.submitted",
+        actor_id=user.id,
+        actor_role="doctor",
+        detail={
+            "bmdc_number": body.bmdc_number,
+            "specialties": body.specialties,
+            "auto_verified": auto_verified,
+        },
+    )
+    db.commit()
+
+    return DoctorApplyOut(
+        access=make_token(user.id, user.role, "access"),
+        refresh=make_token(user.id, user.role, "refresh"),
+        role=user.role,
+        user_id=str(user.id),
+        verified=auto_verified,
+        pending=not auto_verified,
     )
 
 

@@ -22,7 +22,7 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
-from backend.db.models import User
+from backend.db.models import DoctorProfile, User
 from backend.db.session import get_db
 
 
@@ -103,3 +103,13 @@ def require_role(*roles: str):
 require_patient = require_role("patient")
 require_doctor = require_role("doctor")
 require_admin = require_role("admin")
+
+
+def require_verified_doctor(
+    user: User = Depends(require_doctor),
+    db: Session = Depends(get_db),
+) -> User:
+    profile = db.get(DoctorProfile, user.id)
+    if profile is None or not profile.verified:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "doctor pending verification")
+    return user

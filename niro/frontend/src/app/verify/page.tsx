@@ -46,7 +46,7 @@ function VerifyForm() {
           code,
         });
         saveSession(session);
-        router.replace(session.role === "doctor" ? "/doctor-portal/inbox" : "/home");
+        router.replace(session.role === "doctor" ? "/doctor-portal/dashboard" : "/home");
       } else if (mode === "reset") {
         const session = await authApi.resetConfirm({
           phone,
@@ -54,11 +54,11 @@ function VerifyForm() {
           new_password: newPassword,
         });
         saveSession(session);
-        router.replace(session.role === "doctor" ? "/doctor-portal/inbox" : "/home");
+        router.replace(session.role === "doctor" ? "/doctor-portal/dashboard" : "/home");
       } else {
         const session = await authApi.loginOtpVerify(phone, code, name || undefined);
         saveSession(session);
-        router.replace(session.role === "doctor" ? "/doctor-portal/inbox" : "/home");
+        router.replace(session.role === "doctor" ? "/doctor-portal/dashboard" : "/home");
       }
     } catch (err) {
       setTopError(parseAuthError(err).detail);

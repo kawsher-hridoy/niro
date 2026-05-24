@@ -131,6 +131,7 @@ function getPageTitle(pathname: string, search: SearchParamsLike) {
   if (pathname.startsWith("/analyses/")) return "AI বিশ্লেষণ";
   if (pathname === "/settings") return "সেটিংস";
   if (pathname.startsWith("/chamber/scan")) return "চেম্বার স্ক্যান";
+  if (pathname === "/doctor-portal" || pathname.startsWith("/doctor-portal/dashboard")) return "ড্যাশবোর্ড";
   if (pathname.startsWith("/doctor-portal/inbox")) return "ইনবক্স";
   if (pathname.startsWith("/doctor-portal/chamber")) return "চেম্বার সেশন";
   if (pathname.startsWith("/doctor-portal/cases/")) return "কেস পর্যালোচনা";

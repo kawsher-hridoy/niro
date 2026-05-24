@@ -5,14 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi, parseAuthError, saveSession } from "@/lib/api";
 
-type Tab = "signin" | "signup";
+type Tab = "signin" | "signup" | "doctor";
 
 export default function SignInPage() {
   const [tab, setTab] = useState<Tab>("signin");
 
   return (
     <main className="flex-1 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
+      <div className={`w-full ${tab === "doctor" ? "max-w-2xl" : "max-w-md"}`}>
         <div className="text-center mb-6">
           <Link
             href="/"
@@ -23,7 +23,7 @@ export default function SignInPage() {
         </div>
         <div className="bg-[var(--color-card)] border border-[var(--color-card-border)] rounded-xl shadow-sm p-8">
           <Tabs tab={tab} onChange={setTab} />
-          {tab === "signin" ? <SignInForm /> : <SignUpForm />}
+          {tab === "signin" ? <SignInForm /> : tab === "signup" ? <SignUpForm /> : <DoctorApplyForm />}
         </div>
       </div>
     </main>
@@ -38,6 +38,9 @@ function Tabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
       </TabButton>
       <TabButton active={tab === "signup"} onClick={() => onChange("signup")}>
         সাইন আপ
+      </TabButton>
+      <TabButton active={tab === "doctor"} onClick={() => onChange("doctor")}>
+        ডাক্তার
       </TabButton>
     </div>
   );
@@ -86,7 +89,7 @@ function SignInForm() {
     try {
       const session = await authApi.loginPassword({ identifier, password });
       saveSession(session);
-      router.replace(session.role === "doctor" ? "/doctor-portal/inbox" : "/home");
+      router.replace(session.role === "doctor" ? "/doctor-portal/dashboard" : "/home");
     } catch (err) {
       const parsed = parseAuthError(err);
       setTopError(parsed.detail);
@@ -134,6 +137,86 @@ function SignInForm() {
       >
         OTP দিয়ে সাইন ইন
       </Link>
+    </form>
+  );
+}
+
+function DoctorApplyForm() {
+  const router = useRouter();
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("+8801");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [bmdcNumber, setBmdcNumber] = useState("");
+  const [specialties, setSpecialties] = useState("medicine, general");
+  const [chamberName, setChamberName] = useState("");
+  const [chamberAddress, setChamberAddress] = useState("");
+  const [chamberHours, setChamberHours] = useState("");
+  const [bio, setBio] = useState("");
+  const [feeTier, setFeeTier] = useState(1);
+  const [showPwd, setShowPwd] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [topError, setTopError] = useState<string | null>(null);
+  const [fieldErrs, setFieldErrs] = useState<Record<string, string>>({});
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setTopError(null);
+    setFieldErrs({});
+    setLoading(true);
+    try {
+      const out = await authApi.doctorApply({
+        full_name: fullName,
+        email,
+        phone,
+        password,
+        confirm_password: confirm,
+        bmdc_number: bmdcNumber,
+        specialties: specialties.split(",").map((s) => s.trim()).filter(Boolean),
+        chamber_name: chamberName,
+        chamber_address: chamberAddress,
+        chamber_hours: chamberHours,
+        bio,
+        fee_tier: feeTier,
+      });
+      saveSession(out);
+      router.replace(out.pending ? "/doctor-portal/pending" : "/doctor-portal/dashboard");
+    } catch (err) {
+      const parsed = parseAuthError(err);
+      setTopError(parsed.detail);
+      if (parsed.fields) setFieldErrs(parsed.fields);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      {topError && <TopError>{translateAuthError(topError)}</TopError>}
+      <Field label="ডাক্তার নাম" type="text" value={fullName} onChange={setFullName} placeholder="যেমন: ডা. করিম" autoComplete="name" required error={fieldErrs.full_name} />
+      <Field label="ইমেইল" type="email" value={email} onChange={setEmail} placeholder="doctor@example.com" autoComplete="email" required error={fieldErrs.email} />
+      <Field label="ফোন নম্বর" type="tel" inputMode="tel" value={phone} onChange={setPhone} placeholder="+8801XXXXXXXXX" autoComplete="tel" required error={fieldErrs.phone} />
+      <Field label="BMDC নম্বর" type="text" value={bmdcNumber} onChange={setBmdcNumber} placeholder="BMDC-12345" required error={fieldErrs.bmdc_number} />
+      <Field label="বিশেষত্ব (কমা দিয়ে)" type="text" value={specialties} onChange={setSpecialties} placeholder="medicine, cardiology" required error={fieldErrs.specialties} />
+      <Field label="চেম্বারের নাম" type="text" value={chamberName} onChange={setChamberName} placeholder="Popular Diagnostic Centre" required />
+      <Field label="চেম্বারের ঠিকানা" type="text" value={chamberAddress} onChange={setChamberAddress} placeholder="Dhaka" />
+      <Field label="চেম্বার সময়" type="text" value={chamberHours} onChange={setChamberHours} placeholder="6 PM - 9 PM" />
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-[var(--color-foreground)]">ফি টিয়ার</span>
+        <select value={feeTier} onChange={(e) => setFeeTier(Number(e.target.value))} className="border rounded-lg px-4 py-2.5 bg-[var(--color-background)] text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 border-[var(--color-card-border)]">
+          <option value={1}>১ - ২০০ ৳</option>
+          <option value={2}>২ - ৪০০ ৳</option>
+          <option value={3}>৩ - ৮০০ ৳</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-[var(--color-foreground)]">সংক্ষিপ্ত পরিচিতি</span>
+        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} className="border rounded-lg px-4 py-2.5 bg-[var(--color-background)] text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 border-[var(--color-card-border)]" placeholder="অভিজ্ঞতা, বিশেষজ্ঞতা, ইত্যাদি" />
+      </label>
+      <PasswordField label="পাসওয়ার্ড" value={password} onChange={setPassword} show={showPwd} onToggleShow={() => setShowPwd((s) => !s)} autoComplete="new-password" error={fieldErrs.password} />
+      <PasswordField label="পাসওয়ার্ড আবার দিন" value={confirm} onChange={setConfirm} show={showPwd} onToggleShow={() => setShowPwd((s) => !s)} autoComplete="new-password" error={fieldErrs.confirm_password} />
+      <SubmitButton loading={loading}>ডাক্তার আবেদন জমা দিন</SubmitButton>
     </form>
   );
 }

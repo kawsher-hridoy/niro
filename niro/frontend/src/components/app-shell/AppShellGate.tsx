@@ -61,12 +61,24 @@ export function AppShellGate({
 
         const me = await apiGet<MeOut>("/me");
         if (!alive) return;
-        if (variant === "doctor" && me.role !== "doctor") {
-          router.replace("/home");
+        if (variant === "doctor") {
+          if (me.role !== "doctor") {
+            router.replace("/home");
+            return;
+          }
+          if (me.doctor_verified !== true) {
+            router.replace("/doctor-portal/pending");
+            return;
+          }
+          setUser({ full_name: me.full_name, phone: me.phone });
+          if (pathname === "/doctor-portal") {
+            router.replace("/doctor-portal/dashboard");
+            return;
+          }
           return;
         }
         if (variant === "patient" && me.role === "doctor") {
-          router.replace("/doctor-portal/inbox");
+          router.replace("/doctor-portal/dashboard");
           return;
         }
         setUser({ full_name: me.full_name, phone: me.phone });
@@ -77,7 +89,7 @@ export function AppShellGate({
             const me = await apiGet<MeOut>("/me");
             if (!alive) return;
             if (me.role === "doctor") {
-              router.replace("/doctor-portal/inbox");
+              router.replace(me.doctor_verified === true ? "/doctor-portal/dashboard" : "/doctor-portal/pending");
               return;
             }
           } catch {

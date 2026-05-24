@@ -81,6 +81,12 @@ const patientItems: NavItem[] = [
 
 const doctorItems: NavItem[] = [
   {
+    icon: LayoutDashboard,
+    label: "ড্যাশবোর্ড",
+    href: "/doctor-portal/dashboard",
+    isActive: (pathname) => pathname === "/doctor-portal" || pathname.startsWith("/doctor-portal/dashboard"),
+  },
+  {
     icon: Inbox,
     label: "ইনবক্স",
     href: "/doctor-portal/inbox",
@@ -111,7 +117,7 @@ export function Sidebar({
   const search = useSearchParams();
   const router = useRouter();
   const items = variant === "doctor" ? doctorItems : patientItems;
-  const brandHref = variant === "doctor" ? "/doctor-portal/inbox" : "/home";
+  const brandHref = variant === "doctor" ? "/doctor-portal/dashboard" : "/home";
 
   async function handleLogout() {
     try {
