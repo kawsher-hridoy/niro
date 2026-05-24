@@ -1,24 +1,27 @@
 """Patient profile + timeline + export + delete."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import desc, select
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
 from backend.db.models import (
     AccessLog,
     Analysis,
+    Consent,
     Document,
     PatientProfile,
     User,
+    VerificationRequest,
     VerificationReview,
 )
 from backend.db.session import get_db
 from backend.services import audit
-from backend.services.auth import require_patient
+from backend.services.auth import current_user, require_patient
 
 
 router = APIRouter(tags=["profile"])
@@ -67,8 +70,54 @@ class AccessLogEntryOut(BaseModel):
     location: str | None
 
 
+class DashboardUserOut(BaseModel):
+    id: str
+    full_name: str
+    phone: str
+
+
+class DashboardCountsOut(BaseModel):
+    documents: int
+    analyses: int
+    verifications: int
+    active_consents: int
+    doctor_views_30d: int
+
+
+class DashboardDocumentOut(BaseModel):
+    id: str
+    kind: str
+    uploaded_at: datetime
+    analysis_id: str | None = None
+
+
+class DashboardAnalysisOut(BaseModel):
+    id: str
+    document_id: str
+    summary_bn: str
+    confidence: float
+    recommend_human_review: bool
+    red_flag_count: int
+    created_at: datetime
+
+
+class DashboardAccessOut(BaseModel):
+    doctor_name: str | None
+    screen: str
+    viewed_at: datetime
+    context: Literal["async", "chamber"]
+
+
+class DashboardOut(BaseModel):
+    user: DashboardUserOut
+    counts: DashboardCountsOut
+    recent_documents: list[DashboardDocumentOut]
+    recent_analyses: list[DashboardAnalysisOut]
+    recent_access: list[DashboardAccessOut]
+
+
 @router.get("/me", response_model=MeOut)
-def me(db: Session = Depends(get_db), user: User = Depends(require_patient)) -> MeOut:
+def me(db: Session = Depends(get_db), user: User = Depends(current_user)) -> MeOut:
     pp = db.get(PatientProfile, user.id)
     return MeOut(
         user_id=str(user.id),
@@ -110,6 +159,137 @@ def update_me(
         pp.weight_kg = body.weight_kg
     db.commit()
     return me(db, user)
+
+
+@router.get("/me/dashboard", response_model=DashboardOut)
+def dashboard(
+    db: Session = Depends(get_db), user: User = Depends(require_patient)
+) -> DashboardOut:
+    now = datetime.now(timezone.utc)
+    views_since = now - timedelta(days=30)
+
+    counts_row = db.execute(
+        select(
+            select(func.count(Document.id))
+            .where(Document.patient_id == user.id)
+            .scalar_subquery()
+            .label("documents"),
+            select(func.count(Analysis.id))
+            .where(Analysis.patient_id == user.id)
+            .scalar_subquery()
+            .label("analyses"),
+            select(func.count(VerificationRequest.id))
+            .outerjoin(
+                VerificationReview,
+                VerificationReview.request_id == VerificationRequest.id,
+            )
+            .where(VerificationRequest.patient_id == user.id)
+            .where(VerificationRequest.payment_status == "paid")
+            .where(VerificationReview.id.is_not(None))
+            .scalar_subquery()
+            .label("verifications"),
+            select(func.count(Consent.id))
+            .where(Consent.patient_id == user.id)
+            .where(Consent.revoked_at.is_(None))
+            .where(Consent.expires_at > now)
+            .scalar_subquery()
+            .label("active_consents"),
+            select(func.count(AccessLog.id))
+            .where(AccessLog.patient_id == user.id)
+            .where(AccessLog.viewed_at >= views_since)
+            .scalar_subquery()
+            .label("doctor_views_30d"),
+        )
+    ).one()._mapping
+
+    latest_analysis = (
+        select(
+            Analysis.document_id.label("document_id"),
+            Analysis.id.label("analysis_id"),
+            func.row_number()
+            .over(partition_by=Analysis.document_id, order_by=desc(Analysis.created_at))
+            .label("rn"),
+        )
+        .where(Analysis.patient_id == user.id)
+        .subquery()
+    )
+
+    doc_rows = db.execute(
+        select(Document.id, Document.kind, Document.uploaded_at, latest_analysis.c.analysis_id)
+        .outerjoin(
+            latest_analysis,
+            and_(
+                latest_analysis.c.document_id == Document.id,
+                latest_analysis.c.rn == 1,
+            ),
+        )
+        .where(Document.patient_id == user.id)
+        .order_by(desc(Document.uploaded_at))
+        .limit(5)
+    ).all()
+
+    analysis_rows = db.execute(
+        select(Analysis)
+        .where(Analysis.patient_id == user.id)
+        .order_by(desc(Analysis.created_at))
+        .limit(3)
+    ).scalars().all()
+
+    access_rows = db.execute(
+        select(AccessLog, User.full_name, Consent.context)
+        .join(User, User.id == AccessLog.doctor_id)
+        .outerjoin(Consent, Consent.id == AccessLog.consent_id)
+        .where(AccessLog.patient_id == user.id)
+        .order_by(desc(AccessLog.viewed_at))
+        .limit(3)
+    ).all()
+
+    return DashboardOut(
+        user=DashboardUserOut(
+            id=str(user.id),
+            full_name=user.full_name,
+            phone=user.phone,
+        ),
+        counts=DashboardCountsOut(
+            documents=int(counts_row["documents"] or 0),
+            analyses=int(counts_row["analyses"] or 0),
+            verifications=int(counts_row["verifications"] or 0),
+            active_consents=int(counts_row["active_consents"] or 0),
+            doctor_views_30d=int(counts_row["doctor_views_30d"] or 0),
+        ),
+        recent_documents=[
+            DashboardDocumentOut(
+                id=str(doc_id),
+                kind=kind,
+                uploaded_at=uploaded_at,
+                analysis_id=str(analysis_id) if analysis_id else None,
+            )
+            for doc_id, kind, uploaded_at, analysis_id in doc_rows
+        ],
+        recent_analyses=[
+            DashboardAnalysisOut(
+                id=str(a.id),
+                document_id=str(a.document_id),
+                summary_bn=(a.explanation_bn or "")[:80],
+                confidence=float(a.confidence),
+                recommend_human_review=float(a.confidence) < 0.5,
+                red_flag_count=len(a.red_flags or []),
+                created_at=a.created_at,
+            )
+            for a in analysis_rows
+        ],
+        recent_access=[
+            DashboardAccessOut(
+                doctor_name=doctor_name,
+                screen=row.screen,
+                viewed_at=row.viewed_at,
+                context="chamber"
+                if (consent_context == "chamber" or (row.location or "").startswith("chamber:"))
+                else "async",
+            )
+            for row, doctor_name, consent_context in access_rows
+        ],
+    )
 
 
 @router.get("/me/timeline", response_model=list[TimelineEntryOut])

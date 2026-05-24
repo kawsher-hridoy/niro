@@ -9,6 +9,7 @@
   --color-card: #ffffff;
   --color-card-border: #e7e5df;
   --color-accent-soft: #e8f4ed;
+  --color-amber-soft: #fff6e5; /* Soft review pill background. */
   --color-accent: #0f7b4a;
 }
 
@@ -21,6 +22,7 @@
   --color-card: var(--color-card);
   --color-card-border: var(--color-card-border);
   --color-accent-soft: var(--color-accent-soft);
+  --color-amber-soft: var(--color-amber-soft);
   --color-accent: var(--color-accent);
   --font-sans: var(--font-bangla);
 }
@@ -31,6 +33,18 @@ body {
   font-family: var(--font-bangla), system-ui, sans-serif;
   font-feature-settings: "akhn", "blwf", "half", "pstf", "vatu", "rphf";
   font-variant-ligatures: common-ligatures contextual;
+}
+
+@layer base {
+  :where(a[href], button, input, select, textarea, [role="button"], [role="menuitem"]) {
+    outline: none;
+  }
+
+  :where(a[href], button, input, select, textarea, [role="button"], [role="menuitem"]):focus-visible {
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--color-primary);
+  }
 }
 
 .font-bangla {

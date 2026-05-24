@@ -86,7 +86,7 @@ function SignInForm() {
     try {
       const session = await authApi.loginPassword({ identifier, password });
       saveSession(session);
-      router.replace("/home");
+      router.replace(session.role === "doctor" ? "/doctor-portal/inbox" : "/home");
     } catch (err) {
       const parsed = parseAuthError(err);
       setTopError(parsed.detail);

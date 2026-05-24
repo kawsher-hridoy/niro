@@ -8,6 +8,8 @@
 const TOKEN_KEY = "niro_access";
 const REFRESH_KEY = "niro_refresh";
 const USER_KEY = "niro_user";
+const ACCESS_COOKIE = "niro_access";
+const REFRESH_COOKIE = "niro_refresh";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api/v1";
@@ -62,11 +64,33 @@ export type Session = {
   user_id: string;
 };
 
+function cookieSuffix(): string {
+  if (typeof window === "undefined") return "";
+  return window.location.protocol === "https:" ? "; Secure" : "";
+}
+
+function setClientCookie(name: string, value: string, maxAgeSeconds: number): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${cookieSuffix()}`;
+}
+
+function readClientCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const prefix = `${name}=`;
+  const match = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix));
+  return match ? decodeURIComponent(match.slice(prefix.length)) : null;
+}
+
 export function saveSession(s: Session): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(TOKEN_KEY, s.access);
   localStorage.setItem(REFRESH_KEY, s.refresh);
   localStorage.setItem(USER_KEY, JSON.stringify({ role: s.role, user_id: s.user_id }));
+  setClientCookie(ACCESS_COOKIE, s.access, 60 * 60);
+  setClientCookie(REFRESH_COOKIE, s.refresh, 60 * 60 * 24 * 30);
 }
 
 export function loadSession(): Session | null {
@@ -88,11 +112,13 @@ export function clearSession(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(USER_KEY);
+  setClientCookie(ACCESS_COOKIE, "", 0);
+  setClientCookie(REFRESH_COOKIE, "", 0);
 }
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(TOKEN_KEY) ?? readClientCookie(ACCESS_COOKIE);
 }
 
 async function _send(
@@ -198,6 +224,18 @@ export const authApi = {
 
 // ---------- typed responses ----------
 
+export type MeOut = {
+  user_id: string;
+  role: Session["role"];
+  phone: string;
+  full_name: string;
+  language: string;
+  dob?: string | null;
+  sex?: string | null;
+  allergies?: unknown[];
+  conditions?: unknown[];
+};
+
 export type DocumentOut = {
   id: string;
   kind: "prescription" | "lab_report" | "discharge" | "other";
@@ -270,6 +308,46 @@ export type AccessLogEntry = {
   viewed_at: string;
   location: string | null;
 };
+
+export type DashboardOut = {
+  user: {
+    id: string;
+    full_name: string;
+    phone: string;
+  };
+  counts: {
+    documents: number;
+    analyses: number;
+    verifications: number;
+    active_consents: number;
+    doctor_views_30d: number;
+  };
+  recent_documents: Array<{
+    id: string;
+    kind: DocumentOut["kind"];
+    uploaded_at: string;
+    analysis_id: string | null;
+  }>;
+  recent_analyses: Array<{
+    id: string;
+    document_id: string;
+    summary_bn: string;
+    confidence: number;
+    recommend_human_review: boolean;
+    red_flag_count: number;
+    created_at: string;
+  }>;
+  recent_access: Array<{
+    doctor_name: string | null;
+    screen: string;
+    viewed_at: string;
+    context: "async" | "chamber";
+  }>;
+};
+
+export function getDashboard(): Promise<DashboardOut> {
+  return apiGet<DashboardOut>("/me/dashboard");
+}
 
 export type DoctorCard = {
   id: string;
