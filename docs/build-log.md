@@ -263,6 +263,16 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **New decision:** D-012 — argon2-cffi for password hashing (OWASP-recommended; passlib+bcrypt 5.x compat trap from D-009 stays avoided).
 - **Commit:** `08dcc5b`.
 
+### Fix #3 — Authenticated medical SaaS app shell and dashboard
+
+- **Problem:** After sign-in, `/home` still felt like a placeholder: no persistent navigation, no dashboard summary, no recent activity, and authenticated pages each carried their own inconsistent chrome.
+- **Root cause:** Phase-D authenticated surfaces were built as isolated pages around localStorage auth. There was no route-group shell, no shared patient/doctor navigation, and no single backend aggregate endpoint for dashboard content.
+- **Change:** Moved patient routes into `app/(app)` and doctor portal routes into `app/(doctor)` while preserving URLs. Added a client-gated `AppShell` with desktop sidebar, mobile drawer, sticky topbar, avatar menu, logout, patient/doctor nav variants, reusable `EmptyState`, and a settings stub. Rebuilt `/home` as a medical SaaS dashboard backed by a new sync `GET /me/dashboard` endpoint with counts, recent documents, recent AI insights, and recent doctor access in one round trip. Added `lucide-react` as the only new frontend dependency, routed doctor logins to `/doctor-portal/inbox`, mirrored tokens into client cookies for shell compatibility, and added global focus-visible treatment for interactive controls.
+- **Files:** `niro/backend/api/routers/profile.py`, `niro/frontend/package.json`, `niro/frontend/package-lock.json`, `niro/frontend/src/app/(app)/*`, `niro/frontend/src/app/(doctor)/*`, `niro/frontend/src/app/settings/page.tsx`, `niro/frontend/src/components/EmptyState.tsx`, `niro/frontend/src/components/app-shell/*`, `niro/frontend/src/lib/api.ts`, `niro/frontend/src/app/globals.css`, `niro/frontend/src/app/signin/page.tsx`, `niro/frontend/src/app/verify/page.tsx`.
+- **Verified by:** `cd niro/frontend && npx tsc --noEmit` exits 0. `python3 -m py_compile niro/backend/api/routers/profile.py` exits 0. User approved after manual verification.
+- **Trade-off:** The route-group layouts use a client auth gate because the existing session source is localStorage; cookies are mirrored for compatibility, but this is not a full httpOnly server-auth migration.
+- **Commit:** `4f43bfc`.
+
 ---
 
 ## Template for new entries
