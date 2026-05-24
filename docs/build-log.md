@@ -282,6 +282,15 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Verified by:** `python3 -m py_compile niro/backend/api/routers/auth.py niro/backend/api/routers/doctor.py niro/backend/api/routers/chamber.py niro/backend/api/routers/profile.py niro/backend/services/auth.py` exits 0. `cd niro/frontend && ./node_modules/.bin/tsc --noEmit` exits 0.
 - **Commit / branch:** `7f3ee31` / `fix/doctor-onboarding-dashboard`.
 
+### Fix #5 — Documentation, agent memory, and skill refresh
+
+- **Problem:** Agent and human docs still described the pre-Fix-#3/#4 system: top-level authenticated pages, empty components, OTP-only auth, no doctor application, and old endpoint/page counts.
+- **Root cause:** Day-5 product fixes changed the app shell, auth, dashboard, and doctor onboarding faster than the long-form docs were updated.
+- **Change:** Refreshed root README, AGENTS/CLAUDE memory, Niro skill, docs index, mocks, API surface, architecture overview, and frontend inventory so they match the current route groups, dashboard endpoints, doctor verification gate, app-shell components, and dev auto-verification behavior.
+- **Files:** `README.md`, `AGENTS.md`, `CLAUDE.md`, `.claude/skills/niro/SKILL.md`, `docs/README.md`, `docs/mocks.md`, `docs/architecture/api-surface.md`, `docs/architecture/overview.md`, `docs/frontend/overview.md`, `docs/frontend/components.md`, `niro/frontend/AGENTS.md`, `niro/frontend/CLAUDE.md`.
+- **Verified by:** Documentation consistency greps for stale counts/routes and manual diff review.
+- **Branch:** `fix/update-docs-agent-skill`.
+
 ---
 
 ## Template for new entries
