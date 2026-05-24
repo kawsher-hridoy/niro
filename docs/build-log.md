@@ -273,6 +273,15 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Trade-off:** The route-group layouts use a client auth gate because the existing session source is localStorage; cookies are mirrored for compatibility, but this is not a full httpOnly server-auth migration.
 - **Commit:** `4f43bfc`.
 
+### Fix #4 — Doctor onboarding and verified doctor dashboard
+
+- **Problem:** Doctors had no clear sign-up path, no pending-review state, and no modern landing surface after login.
+- **Root cause:** The original flow only covered patient auth plus seeded doctor OTP access. There was no dedicated doctor application, no verification gate, and no doctor-specific dashboard shell.
+- **Change:** Added a doctor application flow in `/signin`, a pending-review page, verified-doctor gating, and a doctor variant of the app shell. Built a doctor dashboard with summary cards, urgent queue, recent access, and chamber/inbox navigation; added `/api/v1/doctor/dashboard` and `/api/v1/auth/doctor/apply` to support it. Demo doctors auto-verify outside production, so the seeded doctor login still lands in the dashboard during local demo runs.
+- **Files:** `niro/backend/api/routers/auth.py`, `niro/backend/api/routers/chamber.py`, `niro/backend/api/routers/doctor.py`, `niro/backend/api/routers/profile.py`, `niro/backend/services/auth.py`, `niro/frontend/src/app/signin/page.tsx`, `niro/frontend/src/app/verify/page.tsx`, `niro/frontend/src/app/(doctor)/doctor-portal/dashboard/page.tsx`, `niro/frontend/src/app/(doctor)/doctor-portal/page.tsx`, `niro/frontend/src/app/doctor-portal/pending/page.tsx`, `niro/frontend/src/components/app-shell/AppShellGate.tsx`, `niro/frontend/src/components/app-shell/Sidebar.tsx`, `niro/frontend/src/components/app-shell/Topbar.tsx`, `niro/frontend/src/lib/api.ts`.
+- **Verified by:** `python3 -m py_compile niro/backend/api/routers/auth.py niro/backend/api/routers/doctor.py niro/backend/api/routers/chamber.py niro/backend/api/routers/profile.py niro/backend/services/auth.py` exits 0. `cd niro/frontend && ./node_modules/.bin/tsc --noEmit` exits 0.
+- **Commit / branch:** `7f3ee31` / `fix/doctor-onboarding-dashboard`.
+
 ---
 
 ## Template for new entries
