@@ -1,0 +1,31 @@
+{
+	email niro@hridoy.xyz
+}
+
+# Redirect www → bare domain
+www.nirobd.tech {
+	redir https://nirobd.tech{uri} permanent
+}
+
+nirobd.tech {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(self), camera=(self), microphone=()"
+		-Server
+	}
+
+	# API → FastAPI. `handle` (not handle_path) keeps the /api prefix,
+	# so /api/v1/* maps straight to the backend's /api/v1 mount.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# Everything else → Next.js.
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}
