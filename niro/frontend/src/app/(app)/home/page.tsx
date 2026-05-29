@@ -31,7 +31,7 @@ export default function PatientHome() {
       <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-[var(--color-foreground)]">
-            নমস্কার, {firstName}
+            স্বাগতম, {firstName}
           </h1>
           <p className="mt-1 text-base text-[var(--color-muted)]">
             আজ আপনার স্বাস্থ্যের সংক্ষিপ্ত চিত্র।

@@ -51,7 +51,7 @@ export default function DoctorDashboardPage() {
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
             <BadgeCheck size={14} /> Verified doctor
           </div>
-          <h1 className="mt-3 text-3xl font-semibold text-[var(--color-foreground)]">নমস্কার, {firstName(data.user.full_name)}</h1>
+          <h1 className="mt-3 text-3xl font-semibold text-[var(--color-foreground)]">স্বাগতম, {firstName(data.user.full_name)}</h1>
           <p className="mt-1 text-base text-[var(--color-muted)]">আজকের ডাক্তার-ওয়ার্কফ্লো এক নজরে দেখুন।</p>
         </div>
         <div className="flex items-center gap-2">
