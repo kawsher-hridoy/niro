@@ -73,11 +73,34 @@ function UploadForm() {
       )}
 
       {!reanalyzeDocId && (
-        <label className="flex flex-col gap-2 text-sm">
+        <div className="flex flex-col gap-2 text-sm">
           <span className="font-medium">ফাইল (JPG, PNG, PDF)</span>
-          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
-          {file && <span className="text-xs text-[var(--color-muted)]">{file.name} · {Math.round(file.size / 1024)} KB</span>}
-        </label>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="sr-only"
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={phase !== "pick"}
+            className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--color-card-border)] bg-[var(--color-background)] px-4 py-6 text-sm text-[var(--color-muted)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-60"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            {file ? "অন্য ফাইল নির্বাচন করুন" : "ফাইল নির্বাচন করুন"}
+          </button>
+          {file && (
+            <span className="text-xs text-[var(--color-muted)]">
+              নির্বাচিত: {file.name} · {Math.round(file.size / 1024)} KB
+            </span>
+          )}
+        </div>
       )}
 
       {!reanalyzeDocId && (
