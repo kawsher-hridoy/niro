@@ -282,6 +282,16 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Verified by:** `python3 -m py_compile niro/backend/api/routers/auth.py niro/backend/api/routers/doctor.py niro/backend/api/routers/chamber.py niro/backend/api/routers/profile.py niro/backend/services/auth.py` exits 0. `cd niro/frontend && ./node_modules/.bin/tsc --noEmit` exits 0.
 - **Commit / branch:** `7f3ee31` / `fix/doctor-onboarding-dashboard`.
 
+### Fix #10 — Suppress body hydration warning from browser extensions
+
+- **Problem:** Browser extensions (Grammarly, dark-mode togglers, password managers) inject attributes onto `<body>` after the server-rendered HTML reaches the browser but before React hydrates. React saw the mismatch and logged a noisy red `Warning: Text content did not match` in the dev console on every page load.
+- **Root cause:** `<body>` in `niro/frontend/src/app/layout.tsx` had no `suppressHydrationWarning`. The mismatch is harmless and external (extensions, not Niro code), but React can't tell the difference.
+- **Change:** Added `suppressHydrationWarning` to the `<body>` element in `app/layout.tsx`. Single attribute, no logic change. This is the React-team-recommended fix for body-level hydration mismatches caused by extensions.
+- **Files:** `niro/frontend/src/app/layout.tsx`.
+- **Verified by:** `npx tsc --noEmit` exits 0.
+- **History note:** This change had been sitting uncommitted in the working tree since shortly after Fix #1; it was deliberately not bundled into Fix #2-#9 to keep each fix branch single-concern. Shipping it now under its own branch.
+- **Commit / branch:** `905c88c` / `fix/suppress-body-hydration-warning`.
+
 ### Fix #8 — PDF vision support (rasterize before sending to Azure OpenAI)
 
 - **Problem:** PDFs uploaded fine and were stored on disk, but AI analysis was silently broken. The Azure OpenAI `image_url` content block accepts only PNG/JPEG/GIF/WebP; a `data:application/pdf;base64,...` URI either returned a 400 or produced garbage hallucinations because the model couldn't see the bytes. Probe never caught this because it only tested PNG fixtures (`sample_rx.png`, `sample_lab.png`).
