@@ -20,6 +20,8 @@ from backend.ai.policy import assert_compliant
 from backend.ai.provider import (
     AIProvider,
     CaseSummary,
+    ChatReply,
+    ChatTurn,
     DocKind,
     DocumentAnalysis,
     DocumentReadError,
@@ -91,6 +93,7 @@ class AzureOpenAIProvider(AIProvider):
         mime: str,
         hint_kind: DocKind | None = None,
         history: list[DocumentAnalysis] | None = None,
+        user_prompt: str | None = None,
     ) -> DocumentAnalysis:
         kind = hint_kind or "prescription"
         if kind == "lab_report":
@@ -108,6 +111,9 @@ class AzureOpenAIProvider(AIProvider):
         user_text = "এই ডকুমেন্টটি বিশ্লেষণ করো এবং JSON ফেরত দাও।"
         if len(uris) > 1:
             user_text += "  (multi-page PDF; analyze all pages as one document)"
+        if user_prompt and user_prompt.strip():
+            user_text += "\n\nরোগীর নির্দিষ্ট প্রশ্ন (explanation_bn-এ এটির উত্তর দিন): " + user_prompt.strip()
+            prompt_version = f"{prompt_version}+ask"
         content_blocks: list[dict] = [{"type": "text", "text": user_text}]
         for uri in uris:
             content_blocks.append({"type": "image_url", "image_url": {"url": uri}})
@@ -209,3 +215,68 @@ class AzureOpenAIProvider(AIProvider):
         summary["_latency_ms"] = latency_ms  # type: ignore[typeddict-item]
         assert_compliant(summary)
         return summary
+
+    # ---------- chat ----------
+
+    def chat_about_analysis(
+        self,
+        analysis: DocumentAnalysis,
+        user_message: str,
+        turns: list[ChatTurn] | None = None,
+        history: list[DocumentAnalysis] | None = None,
+    ) -> ChatReply:
+        system_prompt = prompts.CHAT_PROMPT_BN
+        if history:
+            system_prompt = system_prompt + "\n\n" + _history_block(history)
+
+        brief = {
+            "kind": analysis.get("kind"),
+            "structured": analysis.get("structured"),
+            "explanation_bn": analysis.get("explanation_bn"),
+            "red_flags": analysis.get("red_flags"),
+            "questions_bn": analysis.get("questions_bn"),
+        }
+        brief_text = (
+            "বিশ্লেষণের তথ্য (এর উপর ভিত্তি করে উত্তর দিন):\n"
+            + json.dumps(brief, ensure_ascii=False, indent=2)
+        )
+
+        messages: list[dict] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": brief_text},
+        ]
+        for turn in turns or []:
+            messages.append({"role": turn["role"], "content": turn["content"]})
+        messages.append({"role": "user", "content": user_message})
+
+        t0 = time.time()
+        resp = self._client.chat.completions.create(
+            model=self._deployment,
+            messages=messages,
+            response_format={"type": "json_object"},
+            timeout=60,
+        )
+        latency_ms = int((time.time() - t0) * 1000)
+
+        raw = resp.choices[0].message.content or "{}"
+        try:
+            data: dict[str, Any] = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"AI returned non-JSON: {e}") from e
+
+        meta = data.get("_meta") or {}
+        confidence = float(meta.get("confidence", 0.7))
+        answer_bn = data.get("answer_bn", "") or ""
+
+        # Hard rule check — reuse the explanation_bn linter path.
+        assert_compliant({"explanation_bn": answer_bn})
+
+        return {
+            "answer_bn": answer_bn,
+            "confidence": confidence,
+            "model_name": self._deployment,
+            "model_version": self._model_version,
+            "prompt_sha256": _sha256(system_prompt),
+            "output_sha256": _sha256(raw),
+            "latency_ms": latency_ms,
+        }

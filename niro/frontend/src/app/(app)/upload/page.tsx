@@ -12,14 +12,19 @@ function UploadForm() {
 
   const [kind, setKind] = useState<DocKind>(initialKind);
   const [file, setFile] = useState<File | null>(null);
+  const [prompt, setPrompt] = useState("");
   const [phase, setPhase] = useState<"pick" | "uploading" | "analyzing">("pick");
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  async function analyzeDoc(documentId: string) {
+  async function analyzeDoc(documentId: string, userPrompt?: string) {
     setPhase("analyzing");
     try {
-      const a = await apiPost<AnalysisOut>("/analyses", { document_id: documentId, use_history: true });
+      const a = await apiPost<AnalysisOut>("/analyses", {
+        document_id: documentId,
+        use_history: true,
+        user_prompt: userPrompt?.trim() || undefined,
+      });
       router.replace(`/analyses/${a.id}`);
     } catch (e) {
       setErr(formatErr(e));
@@ -41,7 +46,7 @@ function UploadForm() {
       form.append("file", file);
       form.append("kind", kind);
       const doc = await apiUpload<DocumentOut>("/documents", form);
-      await analyzeDoc(doc.id);
+      await analyzeDoc(doc.id, prompt);
     } catch (e) {
       setErr(formatErr(e));
       setPhase("pick");
@@ -72,6 +77,21 @@ function UploadForm() {
           <span className="font-medium">ফাইল (JPG, PNG, PDF)</span>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
           {file && <span className="text-xs text-[var(--color-muted)]">{file.name} · {Math.round(file.size / 1024)} KB</span>}
+        </label>
+      )}
+
+      {!reanalyzeDocId && (
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="font-medium">AI-কে প্রশ্ন (ঐচ্ছিক)</span>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={2}
+            maxLength={1000}
+            placeholder="যেমন: এই ওষুধগুলো কি একসাথে নিরাপদ?"
+            disabled={phase !== "pick"}
+            className="resize-none rounded-lg border border-[var(--color-card-border)] bg-[var(--color-background)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)] disabled:opacity-60"
+          />
         </label>
       )}
 

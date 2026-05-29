@@ -71,6 +71,21 @@ class CaseSummary(TypedDict, total=False):
     output_sha256: str
 
 
+class ChatTurn(TypedDict):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatReply(TypedDict, total=False):
+    answer_bn: str
+    confidence: float
+    model_name: str
+    model_version: str
+    prompt_sha256: str
+    output_sha256: str
+    latency_ms: int
+
+
 # ---------- Errors ----------
 
 class DocumentReadError(Exception):
@@ -89,6 +104,7 @@ class AIProvider(ABC):
         mime: str,
         hint_kind: DocKind | None = None,
         history: list[DocumentAnalysis] | None = None,
+        user_prompt: str | None = None,
     ) -> DocumentAnalysis: ...
 
     @abstractmethod
@@ -97,6 +113,15 @@ class AIProvider(ABC):
         target_analysis: DocumentAnalysis,
         history: list[DocumentAnalysis],
     ) -> CaseSummary: ...
+
+    @abstractmethod
+    def chat_about_analysis(
+        self,
+        analysis: DocumentAnalysis,
+        user_message: str,
+        turns: list[ChatTurn] | None = None,
+        history: list[DocumentAnalysis] | None = None,
+    ) -> ChatReply: ...
 
 
 # ---------- Factory ----------
