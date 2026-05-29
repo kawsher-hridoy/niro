@@ -24,6 +24,8 @@ Tables (PHI columns marked **★** in `DESIGN.md`):
 | `verification_reviews` | C | Doctor's submitted reviews |
 | `doctor_reviews` | C | Patient → doctor ratings (verified consults only) |
 | `chamber_sessions` | C | Chamber QR sessions (table now, flow in Phase D) |
+| `conversations` | E (D-014) | One AI chat thread per analysis (unique `analysis_id`) |
+| `chat_messages` | E (D-014) | Chat turns (`role` user/assistant, `content_bn` ★, confidence/hashes on assistant turns) |
 
 `timeline_entries` is a SQL **VIEW**, not a table — see DESIGN.md §3.
 
@@ -34,6 +36,12 @@ Tables (PHI columns marked **★** in `DESIGN.md`):
 3. `0003_consent` — `consents`, `access_logs` (Phase B).
 4. `0004_verification` — `verification_requests`, `verification_reviews`, `doctor_reviews` (Phase C).
 5. `0005_chamber` — `chamber_sessions` + `timeline_entries` VIEW (Phase C).
+6. `7c1a9f4b2e10` — `conversations`, `chat_messages` (Phase E / D-014; chains from real head `0004_email_password_auth`).
+
+> Note: the revision *ids* on disk differ from the idealized names above
+> (real chain: `d99530cae0c6` → `a376ab1ca234` → `28e9c4a069e8` →
+> `0004_email_password_auth` → `7c1a9f4b2e10`). The current head is
+> **`7c1a9f4b2e10`**.
 
 Always `alembic upgrade head` before starting the backend.
 

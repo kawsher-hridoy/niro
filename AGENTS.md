@@ -19,8 +19,10 @@ by the user — branch per issue, squash-merge after approval) until
 password auth, the authenticated app shell, patient dashboard, doctor
 onboarding, the verified-doctor dashboard, and PDF vision support
 (Fix #8 — PyMuPDF rasterization at 200 DPI, 5-page cap, AGPL caveat
-tracked as OQ-17). Live-demo polish (post-30 May if shortlisted)
-follows.
+tracked as OQ-17). The first post-Phase-1 **feature** also merged:
+document chat + prompt-with-upload (D-014, PR #8 — text-grounded chat
+over an analyzed document, plus an optional prompt on upload).
+Live-demo polish (post-30 May if shortlisted) follows.
 
 ---
 
@@ -66,8 +68,8 @@ follows.
 backend/
   ai/          provider abstraction + Azure impl + Bangla prompts + policy linter
   services/    audit, consent, storage, JWT auth
-  api/routers/ 39 router endpoints across 9 modules (+ /health)
-  db/          14 SQLAlchemy models + 4 Alembic migrations
+  api/routers/ 41 router endpoints across 10 modules (+ /health)
+  db/          16 SQLAlchemy models + 5 Alembic migrations
   seeds/       6 seeded BMDC-verified doctors
 frontend/
   src/app/             Next route groups: (app) patient shell, (doctor) verified doctor shell, plus public auth/chamber pages

@@ -35,7 +35,11 @@ fixes loop, currently active — see "Issue-fix workflow" section below).
 Day-5 fixes already shipped the public landing rebuild, SaaS auth, the
 authenticated patient shell/dashboard, the doctor onboarding +
 verified-doctor dashboard, and PDF vision support (Fix #8 — PyMuPDF
-rasterization at 200 DPI, 5-page cap).
+rasterization at 200 DPI, 5-page cap). The first post-Phase-1 **feature**
+(not a fix) also merged: document chat + prompt-with-upload (D-014,
+PR #8 — `conversations`/`chat_messages` tables, `/api/v1/conversations`
+router, `chat_about_analysis` provider method, chat panel on the
+analysis page).
 
 ---
 
@@ -169,7 +173,7 @@ single switch point.
     │   │   ├── base.py
     │   │   ├── session.py        # sync engine + SessionLocal + get_db
     │   │   ├── models.py         # current SQLAlchemy models
-    │   │   └── migrations/       # revisions through 0004_email_password_auth
+    │   │   └── migrations/       # revisions through 7c1a9f4b2e10 (phase E: chat)
     │   ├── ai/
     │   │   ├── provider.py       # AIProvider ABC + factory
     │   │   ├── azure.py          # AzureOpenAIProvider concrete impl
@@ -183,7 +187,8 @@ single switch point.
     │   ├── api/routers/
     │   │   ├── auth.py           # signup, password login/reset, doctor apply, OTP, refresh/logout
     │   │   ├── documents.py      # upload, list, get, delete
-    │   │   ├── analyses.py       # AI analyze (history-aware) + list + get
+    │   │   ├── analyses.py       # AI analyze (history-aware, optional user_prompt) + list + get
+    │   │   ├── chat.py           # per-analysis conversation: get thread, post message (D-014)
     │   │   ├── profile.py        # /me, /me/dashboard, /timeline, /access-log, DELETE /me
     │   │   ├── consent.py        # grant, revoke
     │   │   ├── verifications.py  # request, mock-pay, list, get
@@ -202,7 +207,7 @@ single switch point.
             │   ├── signin/, signin/otp/, verify/, forgot-password/
             │   ├── (app)/layout.tsx                    # patient authenticated shell
             │   ├── (app)/home/, upload/, timeline/, access-log/
-            │   ├── (app)/analyses/[id]/ (with PDF via window.print)
+            │   ├── (app)/analyses/[id]/ (PDF via window.print + chat panel — D-014)
             │   ├── (app)/doctors/, (app)/doctors/[id]/
             │   ├── (app)/verifications/, (app)/verifications/[id]/ (auto-poll)
             │   ├── chamber/scan/, chamber/[token]/
@@ -237,6 +242,7 @@ single switch point.
 | **D-011** | Landing `/` is a full marketing site (6 sections, light-mode only, no global disclaimer banner) | `app/page.tsx`, `app/globals.css`, `app/layout.tsx` |
 | **D-012** | Password hashing via Argon2id (`argon2-cffi`) | `services/auth.py`, `routers/auth.py`, migration `0004` |
 | **D-013** | PDF rasterization via PyMuPDF (AGPL, swap to pypdfium2 before commercial launch — see OQ-17) | `backend/ai/azure.py` (`_data_uris_for`, `_PDF_MAX_PAGES=5`, `_PDF_DPI=200`), `backend/ai/provider.py` (`DocumentReadError`), `backend/api/routers/analyses.py` |
+| **D-014** | Document chat + prompt-with-upload: text-grounded (reads stored analysis, not re-sent image), blocking, one conversation per analysis | `backend/db/models.py` (`Conversation`, `ChatMessage`), migration `7c1a9f4b2e10`, `backend/ai/prompts.py` (`CHAT_PROMPT_BN`), `backend/ai/azure.py` (`chat_about_analysis`), `backend/api/routers/chat.py`, `frontend/src/components/AnalysisChat.tsx` |
 
 See `docs/decisions.md` for rationale + alternatives on each.
 
@@ -285,7 +291,7 @@ docker compose up -d postgres
 # Backend (terminal 1)
 cd niro
 source .venv/bin/activate
-alembic -c alembic.ini upgrade head    # current head: 28e9c4a069e8
+alembic -c alembic.ini upgrade head    # current head: 7c1a9f4b2e10
 python -m backend.seeds.doctors        # idempotent; seeds 6 doctors
 uvicorn backend.main:app --reload --port 8000
 

@@ -2,6 +2,7 @@
 
 > **Canonical reference:** [`DESIGN.md §4`](../../DESIGN.md#4-api-surface).
 > This file lists every endpoint **as actually built** through Day-5 Fix #4
+> plus the D-014 document-chat feature (PR #8),
 > with curl examples for the demo path.
 
 ## API base
@@ -16,7 +17,7 @@ All responses JSON. Errors:
 
 Auth via `Authorization: Bearer <jwt>` header. JWT access tokens 1h, refresh 30d.
 
-## Full endpoint table (39 router endpoints + health — current)
+## Full endpoint table (41 router endpoints + health — current)
 
 | Method | Path | Auth | Body | Returns |
 |---|---|---|---|---|
@@ -40,9 +41,12 @@ Auth via `Authorization: Bearer <jwt>` header. JWT access tokens 1h, refresh 30d
 | GET | `/documents/{id}` | patient (owner) | — | document meta |
 | DELETE | `/documents/{id}` | patient (owner) | — | 204 |
 | **Analyses** | | | | |
-| POST | `/analyses` | patient | `{document_id,use_history?}` | full analysis (PDFs rasterized via PyMuPDF — see [§ PDF handling](#pdf-handling)) |
+| POST | `/analyses` | patient | `{document_id,use_history?,user_prompt?}` | full analysis (`user_prompt` answered inside `explanation_bn`; PDFs rasterized via PyMuPDF — see [§ PDF handling](#pdf-handling)) |
 | GET | `/analyses/{id}` | bearer (owner or consented doctor) | — | full analysis |
 | GET | `/analyses` | patient | — | own list |
+| **Chat (D-014)** | | | | |
+| GET | `/conversations/{analysis_id}` | patient (owner) | — | existing thread `{analysis_id,conversation_id,messages[]}` |
+| POST | `/conversations/{analysis_id}/messages` | patient (owner) | `{content_bn}` | AI reply grounded in the stored analysis; policy-linted + audited |
 | **Profile** | | | | |
 | GET | `/me` | patient | — | profile |
 | PATCH | `/me` | patient | partial fields | profile |
