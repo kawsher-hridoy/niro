@@ -33,8 +33,9 @@ Generic-agent guidance: `AGENTS.md` (this complements that file).
 session: read `docs/build-log.md` Day 4 entry first, then Day 5 (issue
 fixes loop, currently active — see "Issue-fix workflow" section below).
 Day-5 fixes already shipped the public landing rebuild, SaaS auth, the
-authenticated patient shell/dashboard, and the doctor onboarding +
-verified-doctor dashboard.
+authenticated patient shell/dashboard, the doctor onboarding +
+verified-doctor dashboard, and PDF vision support (Fix #8 — PyMuPDF
+rasterization at 200 DPI, 5-page cap).
 
 ---
 
@@ -235,6 +236,7 @@ single switch point.
 | **D-010** | PDF "export" via browser print stylesheet (not WeasyPrint)                    | `globals.css`, `analyses/[id]/page.tsx` |
 | **D-011** | Landing `/` is a full marketing site (6 sections, light-mode only, no global disclaimer banner) | `app/page.tsx`, `app/globals.css`, `app/layout.tsx` |
 | **D-012** | Password hashing via Argon2id (`argon2-cffi`) | `services/auth.py`, `routers/auth.py`, migration `0004` |
+| **D-013** | PDF rasterization via PyMuPDF (AGPL, swap to pypdfium2 before commercial launch — see OQ-17) | `backend/ai/azure.py` (`_data_uris_for`, `_PDF_MAX_PAGES=5`, `_PDF_DPI=200`), `backend/ai/provider.py` (`DocumentReadError`), `backend/api/routers/analyses.py` |
 
 See `docs/decisions.md` for rationale + alternatives on each.
 

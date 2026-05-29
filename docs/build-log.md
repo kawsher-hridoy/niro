@@ -290,7 +290,16 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Files:** `niro/backend/pyproject.toml` (+pymupdf), `niro/backend/ai/azure.py` (helper + multi-block splat + constants `_PDF_MAX_PAGES=5`, `_PDF_DPI=200`), `niro/backend/ai/provider.py` (DocumentReadError), `niro/backend/api/routers/analyses.py` (catch DocumentReadError → 422 + audit), `niro/probe.py` (TEST 7), `docs/decisions.md` (D-013), `docs/open-questions.md` (OQ-17).
 - **Verified by:** `python -m py_compile` on all backend touchpoints exits 0; `npx tsc --noEmit` exits 0 (no FE changes but smoke); `probe.py` TEST 7 PASS with sample_rx.png round-trip; user manual upload of real PDF in browser.
 - **New decision:** D-013 — PyMuPDF for ICADHI demo speed, AGPL-3.0 acknowledged, swap-later commitment to `pypdfium2` (Apache-2.0) before commercial launch tracked as OQ-17.
-- **Commit / branch:** `<TBD>` / `fix/pdf-vision-support` (squash-merged into `main`, branch deleted).
+- **Commit / branch:** `474af2e` / `fix/pdf-vision-support` (squash-merged into `main`, branch deleted).
+
+### Fix #9 — Docs refresh for PDF vision support
+
+- **Problem:** Fix #8 shipped PDF rasterization in code (`474af2e`) but the surrounding docs still described the pre-Fix-#8 world — `CLAUDE.md` decisions table stopped at D-012, `AGENTS.md` listed no PDF gotcha, the niro skill claimed Day-5 had stopped at Fix #4, `docs/ai-safety/contract.md` falsely said `image_url` accepts PDFs, `docs/ai-safety/audit-logging.md` lacked the new `ai.document_unreadable` event, `docs/architecture/api-surface.md` had no PDF-handling section, and `docs/README.md` footer was a week stale.
+- **Root cause:** Fix #8 only touched the docs that *had* to change to ship the code (`docs/decisions.md` D-013, `docs/open-questions.md` OQ-17, `docs/build-log.md` Day-5 entry). The reference docs that *describe* the system stayed frozen.
+- **Change:** Refreshed `CLAUDE.md` (D-013 row + Day-5 paragraph), `AGENTS.md` (PDF rasterization pitfall + Day-5 status), `.claude/skills/niro/SKILL.md` (frontmatter, Day-5 row, decisions table, AI provider operational notes incl. PDF latency, file map), `docs/README.md` (footer date, audit-event count 15→16, decisions D-001..D-013), `docs/ai-safety/contract.md` (Fix #8 banner, new "unreadable docs fail closed" hard rule, PDF handling section in operational notes), `docs/ai-safety/audit-logging.md` (Fix #8 banner, count 15→16, new `ai.document_unreadable` row), `docs/architecture/api-surface.md` (`POST /documents` MIME hint, link to PDF-handling, dedicated "## PDF handling" section).
+- **Files:** `CLAUDE.md`, `AGENTS.md`, `.claude/skills/niro/SKILL.md`, `docs/README.md`, `docs/ai-safety/contract.md`, `docs/ai-safety/audit-logging.md`, `docs/architecture/api-surface.md`, `docs/build-log.md` (this entry + Fix #8 SHA placeholder filled in).
+- **Verified by:** Visual diff review; no code changed.
+- **Commit / branch:** `a5128b0` / `fix/docs-pdf-vision`.
 
 ### Fix #5 — Documentation, agent memory, and skill refresh
 

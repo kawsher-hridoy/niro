@@ -17,8 +17,10 @@ work is **iterative issue fixes** (Day 5 in `docs/build-log.md`, driven
 by the user — branch per issue, squash-merge after approval) until
 27 May submission. Day-5 fixes now include the marketing landing,
 password auth, the authenticated app shell, patient dashboard, doctor
-onboarding, and the verified-doctor dashboard. Live-demo polish
-(post-30 May if shortlisted) follows.
+onboarding, the verified-doctor dashboard, and PDF vision support
+(Fix #8 — PyMuPDF rasterization at 200 DPI, 5-page cap, AGPL caveat
+tracked as OQ-17). Live-demo polish (post-30 May if shortlisted)
+follows.
 
 ---
 
@@ -83,6 +85,8 @@ The detailed map is in `CLAUDE.md` "Repo layout".
 - **Docker Hub IPv6** is unreachable from many BD networks. We use the cached `postgres:16.3-alpine3.20` (D-007).
 - **Azure key typos** — the user once pasted with a trailing `s`. If you see HTTP 401, check `.env` key length and last 4 chars. See `docs/build-log.md` Day 2.
 - **`max_tokens` rejected by `gpt-chat-latest`** — this is a GPT-5-class model. Use `max_completion_tokens` if you need a limit, or omit (we omit).
+- **PDFs need rasterization** — Azure OpenAI's `image_url` block does not accept `application/pdf`. The provider rasterizes server-side via PyMuPDF at 200 DPI (5-page cap) before splatting one `image_url` block per page. See `_data_uris_for` in `niro/backend/ai/azure.py` and D-013. **Don't** introduce `pdf2image` or directly send PDFs to the vision endpoint.
+- **PyMuPDF is AGPL** — swap to `pypdfium2` before any commercial launch (OQ-17).
 - **Frontend dir is `niro/frontend/`, not `frontend/`** — `mkdir frontend/...` from the wrong cwd creates a sibling repo.
 - **`DisclaimerBanner` no longer exists** — deleted in Fix #1 (D-011). Don't import it. Inline AI disclaimer copy on result pages instead.
 - **Don't recreate `prefers-color-scheme: dark`** — Phase 1 is light-mode only (D-011).

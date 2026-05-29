@@ -35,12 +35,12 @@ Auth via `Authorization: Bearer <jwt>` header. JWT access tokens 1h, refresh 30d
 | POST | `/auth/refresh` | none | `{refresh}` | `{access}` |
 | POST | `/auth/logout` | bearer | — | `{ok}` |
 | **Documents** | | | | |
-| POST | `/documents` | patient | multipart `file`+`kind` | document meta |
+| POST | `/documents` | patient | multipart `file`+`kind` (PNG/JPEG/WebP/PDF, ≤10 MB) | document meta |
 | GET | `/documents` | patient | — | document list |
 | GET | `/documents/{id}` | patient (owner) | — | document meta |
 | DELETE | `/documents/{id}` | patient (owner) | — | 204 |
 | **Analyses** | | | | |
-| POST | `/analyses` | patient | `{document_id,use_history?}` | full analysis |
+| POST | `/analyses` | patient | `{document_id,use_history?}` | full analysis (PDFs rasterized via PyMuPDF — see [§ PDF handling](#pdf-handling)) |
 | GET | `/analyses/{id}` | bearer (owner or consented doctor) | — | full analysis |
 | GET | `/analyses` | patient | — | own list |
 | **Profile** | | | | |
@@ -185,5 +185,17 @@ Expect 12-15 distinct event types after running the full flow.
 
 - **Rate limiting:** not enforced in Phase 1. Phase F adds Redis-backed limits.
 - **CORS:** dev allows `http://localhost:3000` only.
-- **Request size:** documents up to 10MB (`backend/api/routers/documents.py:_MAX_SIZE`).
+- **Request size:** documents up to 10MB (`backend/api/routers/documents.py:_MAX_SIZE`). Larger uploads return HTTP 413 before AI is invoked.
 - **Auto-generated OpenAPI:** `GET /docs` (Swagger UI), `GET /redoc`, `GET /openapi.json`.
+
+## PDF handling
+
+`POST /analyses` accepts documents stored from `POST /documents` regardless of MIME, but Azure OpenAI's `image_url` content block does not accept `application/pdf`. The provider rasterizes PDFs server-side in `_data_uris_for` (`niro/backend/ai/azure.py`) before the vision call:
+
+- **Renderer:** PyMuPDF (`pymupdf>=1.24`) — see D-013.
+- **DPI:** 200 (`_PDF_DPI`).
+- **Page cap:** 5 (`_PDF_MAX_PAGES`). Pages 6+ are silently dropped.
+- **Per-page output:** PNG, ~200-500 KB before base64 encoding.
+- **Wire format:** one `{"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}` block per rendered page, all in the same chat message. Multi-page uploads also append `(multi-page PDF; analyze all pages as one document)` to the user prompt.
+- **Failure mode:** unreadable / encrypted / corrupted PDFs raise `DocumentReadError` (defined in `backend/ai/provider.py`); the analyze route catches it and returns **HTTP 422** with body `{"detail":"could not read document; PDF may be encrypted or corrupted"}` and an `ai.document_unreadable` audit event.
+- **AGPL caveat:** PyMuPDF is AGPL-3.0; tracked for swap to `pypdfium2` before commercial launch (OQ-17).

@@ -22,8 +22,9 @@ Build-time engineering docs for the Niro project.
 | G — Demo day | Conditional | 15 June |
 
 39 router endpoints plus health, 20 URL-visible frontend pages, 14 DB
-models, 15+ distinct audit event types in use, 6 seeded doctors, and
-dev-mode doctor applications that auto-verify for demos.
+models, 16+ distinct audit event types in use (incl. `ai.document_unreadable`
+from Fix #8), 6 seeded doctors, and dev-mode doctor applications that
+auto-verify for demos.
 
 ---
 
@@ -34,7 +35,7 @@ dev-mode doctor applications that auto-verify for demos.
 - [`env-vars.md`](env-vars.md) — every environment variable explained
 - [`mocks.md`](mocks.md) — Phase-1 safe mocks (OTP, bKash, BMDC) — what's faked and why
 - [`build-log.md`](build-log.md) — daily progress diary (Day 0 through active Day 5 fixes)
-- [`decisions.md`](decisions.md) — locked decisions D-001..D-012
+- [`decisions.md`](decisions.md) — locked decisions D-001..D-013
 - [`open-questions.md`](open-questions.md) — still-TBD items with default answers
 - [`glossary.md`](glossary.md) — Bangla terms, medical abbreviations, project acronyms
 
@@ -95,4 +96,4 @@ dev-mode doctor applications that auto-verify for demos.
 
 ---
 
-*Last updated: 24 May 2026 (post Day-5 Fix #4: doctor onboarding + verified doctor dashboard).*
+*Last updated: 29 May 2026 (post Day-5 Fix #8: PDF vision support via PyMuPDF rasterization).*

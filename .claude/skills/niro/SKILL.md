@@ -1,12 +1,12 @@
 ---
 name: niro
-description: Use when working on the Niro health-app codebase — implementing features, debugging the AI provider integration, reasoning about ICADHI submission constraints, or extending the current FastAPI/Next.js codebase. Reflects state as of Day-5 Fix #4: SaaS auth, app shell, patient dashboard, doctor onboarding, and verified-doctor dashboard are merged; iterative issue-fix loop active.
+description: Use when working on the Niro health-app codebase — implementing features, debugging the AI provider integration, reasoning about ICADHI submission constraints, or extending the current FastAPI/Next.js codebase. Reflects state as of Day-5 Fix #8: SaaS auth, app shell, patient dashboard, doctor onboarding, verified-doctor dashboard, and PDF vision support are merged; iterative issue-fix loop active.
 ---
 
 # Niro project skill
 
 Use this when work touches Niro (the IEEE ICADHI 2026 health app in this
-repo). Reflects state **as of Day-5 Fix #4 — Phase 1 is
+repo). Reflects state **as of Day-5 Fix #8 — Phase 1 is
 feature-complete; the user is driving an iterative issue-fix loop until
 the 27 May Phase-1 video submission**.
 
@@ -28,12 +28,12 @@ Live engineering docs: `docs/` folder.
 | B — AI integration + upload path | ✅ Merged (PR #2) |
 | C — Profile + verification + doctor portal | ✅ Merged (PR #3) |
 | D — Chamber QR + browser PDF + polish | ✅ Merged (PR #4) |
-| **Day 5 — iterative issue fixes** | 🔧 **Active** — Fix #1 landing, Fix #2 SaaS auth, Fix #3 app shell/dashboard, Fix #4 doctor onboarding/dashboard merged |
+| **Day 5 — iterative issue fixes** | 🔧 **Active** — Fix #1 landing, Fix #2 SaaS auth, Fix #3 app shell/dashboard, Fix #4 doctor onboarding/dashboard, Fix #8 PDF vision support merged |
 | **E — Video submission** | ⏳ **User action** — record + upload by 27 May |
 | F — Live-demo polish + VPS deploy | Conditional on 30 May shortlist |
 | G — Demo day | 15 June |
 
-`main` has Day-5 Fix #4 pushed (`7f3ee31` plus build-log commit `4d57fbe`).
+`main` has Day-5 Fix #8 pushed (`474af2e` — PDF vision support).
 Read `docs/build-log.md` Day 4 first, then Day 5 for the active fix loop.
 
 **Active workflow plan:** `/home/l0minex/.claude/plans/twinkly-inventing-pebble.md` v2.0
@@ -67,6 +67,8 @@ Read `docs/build-log.md` Day 4 first, then Day 5 for the active fix loop.
 | D-009 | OTP storage: `sha256(salt:code)` (not bcrypt) | Locked |
 | D-010 | PDF export via browser `window.print()` (not WeasyPrint) | Locked for Phase 1 |
 | D-011 | Landing `/` is a full marketing site, light-mode only; `DisclaimerBanner` removed | Locked for Phase 1 |
+| D-012 | Password hashing via Argon2id (`argon2-cffi`) | Locked |
+| D-013 | PDF rasterization via PyMuPDF (200 DPI, 5-page cap) before vision call | Provisional — swap to `pypdfium2` before commercial launch (OQ-17, AGPL) |
 
 Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also need an ADR.
 
@@ -76,12 +78,14 @@ Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also nee
 - **Endpoint:** `https://ai-for-security.services.ai.azure.com/openai/v1`
 - **Auth header:** `Authorization: Bearer <key>` — **not** `api-key: <key>`. The v1 compatibility endpoint uses Bearer.
 - **Account caveat:** under user's own Gmail Azure subscription; fine for ICADHI; migrate to org account post-final.
-- **Capability probe:** `niro/probe.py`. Last result: 6/6 PASS, latency 1.27s small calls.
+- **Capability probe:** `niro/probe.py`. Last result: 6/6 PASS, latency 1.27s small calls. **TEST 7** added in Fix #8 covers the PDF round-trip (`sample_rx.png` → in-memory PDF → PyMuPDF rasterize → vision call); requires the optional `pymupdf` dep.
 - **Latency reality:**
   - Bangla text generation: ~1-3s
   - Vision + structured JSON: ~8-12s
   - Vision + history-aware: ~15-24s
   - Case-summary generation: ~5-9s
+  - Vision on multi-page PDF (5 pages, history-aware): ~20-30s
+- **PDF handling:** Azure OpenAI's `image_url` block accepts only PNG/JPEG/GIF/WebP. The provider rasterizes `application/pdf` server-side via PyMuPDF (`_data_uris_for` in `backend/ai/azure.py`) at **200 DPI**, capped at **5 pages** (`_PDF_MAX_PAGES`). One `image_url` block per page is splatted into the same chat message. Unreadable PDFs raise `DocumentReadError` → HTTP 422 + `ai.document_unreadable` audit event. PyMuPDF is AGPL — see D-013 + OQ-17 for the swap-to-`pypdfium2` plan before commercial launch.
 - **Re-run probe after any key/provider/model change.**
 
 ## Current code paths — what exists, where
@@ -123,8 +127,8 @@ Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also nee
 
 | File | Purpose |
 |---|---|
-| `ai/provider.py` | `AIProvider` ABC; types `DocumentAnalysis`, `CaseSummary`, `Medication`, `LabValue`, `RedFlag`; `get_provider()` factory |
-| `ai/azure.py` | `AzureOpenAIProvider` — vision + Bangla + JSON + tools |
+| `ai/provider.py` | `AIProvider` ABC; types `DocumentAnalysis`, `CaseSummary`, `Medication`, `LabValue`, `RedFlag`; `DocumentReadError`; `get_provider()` factory |
+| `ai/azure.py` | `AzureOpenAIProvider` — vision + Bangla + JSON + tools; `_data_uris_for` rasterizes PDFs via PyMuPDF (200 DPI, 5-page cap) |
 | `ai/prompts.py` | Versioned Bangla prompts: `PRESCRIPTION_PROMPT_BN` (rx-bn-v1.0), `LAB_REPORT_PROMPT_BN` (lab-bn-v1.0), `HISTORY_INTRO_BN` (hist-bn-v1.0), `CASE_SUMMARY_PROMPT_BN` (case-bn-v1.0) |
 | `ai/policy.py` | `assert_compliant(payload)` raises `AIPolicyViolation` on banned phrases |
 

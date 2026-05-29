@@ -1,7 +1,7 @@
 # AI Safety — Contract
 
 > **Canonical reference:** [`DESIGN.md §5`](../../DESIGN.md#5-ai-integration-contract).
-> This file documents what's **actually built** through Day-5 Fix #4.
+> This file documents what's **actually built** through Day-5 Fix #8.
 
 ## The interface — `backend/ai/provider.py`
 
@@ -73,6 +73,10 @@ Provider selected via `AI_PROVIDER` env var. Factory:
    `doctor.py` (case-summary path) both record an `ai.*` event.
 3. **Confidence threshold = 0.5.** Below this, `recommend_human_review`
    is `True` and the UI surfaces an explicit "ask a doctor" CTA.
+4. **Unreadable documents fail closed.** PDFs that PyMuPDF cannot decode
+   raise `DocumentReadError` (defined in `ai/provider.py`) which the
+   analyze route catches → `ai.document_unreadable` audit event + 422
+   response. No silent garbage analysis, no 500.
 
 ## Banned phrase patterns (`ai/policy.py`)
 
@@ -136,7 +140,8 @@ missing. UI mapping:
 
 - **Auth header:** `Authorization: Bearer <key>` (NOT `api-key:`).
 - **`max_tokens` rejected** by `gpt-chat-latest` — use `max_completion_tokens` or omit. We omit.
-- **Image format:** `data:` URI with base64-encoded PNG/JPEG/WebP/PDF. See `niro/probe.py`.
+- **Image format:** `data:` URI with base64-encoded PNG/JPEG/WebP. Azure OpenAI's `image_url` block does **not** accept `application/pdf`.
+- **PDF handling (Fix #8 / D-013):** PDFs uploaded by patients are rasterized server-side via PyMuPDF in `_data_uris_for` (`backend/ai/azure.py`) at **200 DPI**, capped at **`_PDF_MAX_PAGES = 5`** pages. Each rendered page becomes its own `image_url` content block in the same chat message. When `len(uris) > 1` the user prompt is suffixed with `(multi-page PDF; analyze all pages as one document)`. Pages 6+ are silently dropped — UI does not yet warn. PyMuPDF is AGPL-3.0; **swap to `pypdfium2` before commercial launch** (OQ-17).
 - **JSON output:** always pass `response_format={"type":"json_object"}`.
 - **History context:** capped at last 3 analyses to keep prompt size manageable.
 

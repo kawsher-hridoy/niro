@@ -1,7 +1,7 @@
 # AI Safety — Audit Logging
 
 This doc defines the **audit event taxonomy** for Niro and tracks the
-**actual events in use** as of Day-5 Fix #4.
+**actual events in use** as of Day-5 Fix #8.
 
 The `audit_log` table schema lives in [`DESIGN.md §3`](../../DESIGN.md#3-data-model).
 
@@ -25,7 +25,7 @@ Both are append-only.
 
 ## Actual events in use
 
-15+ distinct event types confirmed in `audit_log` during the full smoke
+16+ distinct event types confirmed in `audit_log` during the full smoke
 test.
 
 | Event | Where it's written | Fields populated |
@@ -40,6 +40,7 @@ test.
 | `ai.analyze.history_aware` | `routers/analyses.py analyze` (with history) | same + `detail.history_count` |
 | `ai.case_summary` | `routers/doctor.py get_case` | model fields + `detail.request_id` |
 | `ai.policy_violation` | `routers/analyses.py analyze` (catch block) | `detail.reason` |
+| `ai.document_unreadable` | `routers/analyses.py analyze` (catch `DocumentReadError`) | `actor_id`, `patient_id`, `document_id`, `detail.{reason,mime}` |
 | `consent.granted` | `routers/consent.py grant`, `routers/verifications.py create`, `routers/chamber.py scan` | `consent_id`, `detail.{scope,context,hours}` |
 | `consent.revoked` | `routers/consent.py revoke` | `consent_id` |
 | `consent.check_denied` | `services/consent.py require` | `actor_id`, `detail.reason`, `detail.context` |
