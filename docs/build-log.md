@@ -291,6 +291,14 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Pending on prod:** Fix #11 (greeting) and the D-014 chat feature are on `main` but only reach nirobd.tech after the next `./deploy.sh` run on the VM. Backups timer + Sentry/uptime monitor still open (see `topology.md`).
 - **Commit / branch:** `docs/deploy-reality` (this doc sync); deploy tooling already on `main` via `d2de79d`/`52dd6e0`.
 
+### Fix #12 — Style the upload file picker
+
+- **Problem:** The upload page used a bare `<input type="file">`, so browsers rendered their default gray "Choose File / কোনো ফাইল নির্বাচন করা হয়নি" control — visually broken against the design system.
+- **Change:** Hid the native input (`sr-only`, kept functional) and added a dashed drop-zone button that proxies clicks to it — theme tokens, upload icon, Bangla label ("ফাইল নির্বাচন করুন" → "অন্য ফাইল নির্বাচন করুন" once chosen), hover turns primary-green, selected filename + size shown below as "নির্বাচিত: …". Dropped the redundant `required` attr (hiding a required control can trip a browser focus error; submit is already gated on `!file`).
+- **Files:** `niro/frontend/src/app/(app)/upload/page.tsx`.
+- **Verified by:** `npx tsc --noEmit` exits 0; user confirmed in browser.
+- **Commit / branch:** `1d19a02` / `fix/upload-file-input` (squash-merged into `main`, branch deleted).
+
 ### Fix #11 — Welcome greeting on dashboards
 
 - **Problem:** The patient home and verified-doctor dashboards greeted the signed-in user with `নমস্কার, {firstName}` ("hello/namaste"). The intended copy is a welcome ("স্বাগতম").
