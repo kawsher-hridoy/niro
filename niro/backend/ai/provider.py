@@ -71,6 +71,12 @@ class CaseSummary(TypedDict, total=False):
     output_sha256: str
 
 
+# ---------- Errors ----------
+
+class DocumentReadError(Exception):
+    """Raised when an uploaded document cannot be decoded (e.g., encrypted/corrupted PDF)."""
+
+
 # ---------- Abstract base ----------
 
 class AIProvider(ABC):

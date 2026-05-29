@@ -282,6 +282,16 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Verified by:** `python3 -m py_compile niro/backend/api/routers/auth.py niro/backend/api/routers/doctor.py niro/backend/api/routers/chamber.py niro/backend/api/routers/profile.py niro/backend/services/auth.py` exits 0. `cd niro/frontend && ./node_modules/.bin/tsc --noEmit` exits 0.
 - **Commit / branch:** `7f3ee31` / `fix/doctor-onboarding-dashboard`.
 
+### Fix #8 — PDF vision support (rasterize before sending to Azure OpenAI)
+
+- **Problem:** PDFs uploaded fine and were stored on disk, but AI analysis was silently broken. The Azure OpenAI `image_url` content block accepts only PNG/JPEG/GIF/WebP; a `data:application/pdf;base64,...` URI either returned a 400 or produced garbage hallucinations because the model couldn't see the bytes. Probe never caught this because it only tested PNG fixtures (`sample_rx.png`, `sample_lab.png`).
+- **Root cause:** `niro/backend/ai/azure.py` (~line 84 pre-fix) constructed a single `image_url` data URI regardless of MIME and shipped it as the user message's only image block. Upload allowlist, storage layer, and frontend `accept` attribute all already accepted PDFs, so the bug was invisible until end-to-end testing with a real PDF.
+- **Change:** Added `pymupdf` dependency. New `_data_uris_for(data, mime)` helper in `azure.py` rasterizes PDFs to PNGs at 200 DPI, capped at 5 pages, and returns a list of `data:image/png;base64,...` URIs. Image MIMEs pass through unchanged (single-element list). `analyze_document` now splats one `image_url` block per page in the same chat message; if multi-page, the user prompt is suffixed with "(multi-page PDF; analyze all pages as one document)". A `DocumentReadError` exception was added to `backend/ai/provider.py` so unreadable PDFs (encrypted/corrupted) surface as HTTP 422 with an `ai.document_unreadable` audit event instead of a 500. Probe gained TEST 7 — a round-trip test that synthesizes a PDF from `sample_rx.png` via PyMuPDF, rasterizes it back, and asserts the same medication-extraction quality bar as TEST 3.
+- **Files:** `niro/backend/pyproject.toml` (+pymupdf), `niro/backend/ai/azure.py` (helper + multi-block splat + constants `_PDF_MAX_PAGES=5`, `_PDF_DPI=200`), `niro/backend/ai/provider.py` (DocumentReadError), `niro/backend/api/routers/analyses.py` (catch DocumentReadError → 422 + audit), `niro/probe.py` (TEST 7), `docs/decisions.md` (D-013), `docs/open-questions.md` (OQ-17).
+- **Verified by:** `python -m py_compile` on all backend touchpoints exits 0; `npx tsc --noEmit` exits 0 (no FE changes but smoke); `probe.py` TEST 7 PASS with sample_rx.png round-trip; user manual upload of real PDF in browser.
+- **New decision:** D-013 — PyMuPDF for ICADHI demo speed, AGPL-3.0 acknowledged, swap-later commitment to `pypdfium2` (Apache-2.0) before commercial launch tracked as OQ-17.
+- **Commit / branch:** `<TBD>` / `fix/pdf-vision-support` (squash-merged into `main`, branch deleted).
+
 ### Fix #5 — Documentation, agent memory, and skill refresh
 
 - **Problem:** Agent and human docs still described the pre-Fix-#3/#4 system: top-level authenticated pages, empty components, OTP-only auth, no doctor application, and old endpoint/page counts.

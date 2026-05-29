@@ -82,6 +82,15 @@ back on. Resolved questions move to [`decisions.md`](decisions.md).
 - **Who decides:** kawsher-hridoy.
 - **When needed:** post-shortlist.
 
+## OQ-17 — Swap PyMuPDF → pypdfium2 before commercial launch (AGPL)
+
+- **Default:** Replace `pymupdf` with `pypdfium2` in `niro/backend/ai/azure.py` `_data_uris_for` helper. The API surface for rasterizing PDF bytes at a given DPI is a near drop-in (`pypdfium2.PdfDocument(data) → page.render(scale=dpi/72)`). Effort ~30 min including re-running probe TEST 7.
+- **Why:** PyMuPDF is AGPL-3.0. The network-use clause triggers as soon as Niro is offered as a hosted service to real users; would otherwise force open-sourcing the entire codebase or buying Artifex's commercial license. Acceptable for ICADHI demo (academic showcase, not yet a paid service) — see D-013.
+- **Trigger:** Any non-demo deployment with real patients OR any plan to take revenue. Whichever comes first.
+- **Affects:** `niro/backend/pyproject.toml`, `niro/backend/ai/azure.py`, `niro/probe.py`. D-013 status flips to "Locked (replaced)".
+- **Who decides:** kawsher-hridoy.
+- **When needed:** before first paying patient / before public launch.
+
 ---
 
 ## How to resolve a question

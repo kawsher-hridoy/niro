@@ -187,6 +187,47 @@ except Exception as e:
     record("latency_small", False, f"exception: {e}")
 
 
+# ------------------------- TEST 7: Vision on prescription PDF -------------------------
+section("TEST 7 — Vision: read prescription PDF (round-trip via PyMuPDF)")
+try:
+    import pymupdf
+
+    with open("sample_rx.png", "rb") as f:
+        png_bytes = f.read()
+
+    src = pymupdf.open()
+    page = src.new_page(width=595, height=842)
+    page.insert_image(page.rect, stream=png_bytes)
+    pdf_bytes = src.tobytes()
+    src.close()
+
+    rast = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    pages_rendered = min(len(rast), 5)
+    assert pages_rendered == 1, f"expected 1 page, got {pages_rendered}"
+    rendered_png = rast[0].get_pixmap(dpi=200).tobytes("png")
+    rast.close()
+
+    img = base64.b64encode(rendered_png).decode()
+    r = call([
+        {"role": "user", "content": [
+            {"type": "text", "text":
+             "This is a doctor's prescription (rasterized from PDF). Extract the medications as JSON: "
+             "{ \"medications\": [{name, strength, dosage, frequency, duration}] }. Return JSON only."},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}}
+        ]}
+    ], response_format={"type": "json_object"})
+    txt = r.choices[0].message.content or "{}"
+    print(txt[:1500])
+    data = json.loads(txt)
+    meds = data.get("medications", []) or []
+    has_metformin = any("metformin" in (m.get("name") or "").lower() for m in meds)
+    ok = len(meds) >= 4 and has_metformin
+    record("vision_prescription_pdf", ok, f"{len(meds)} medications read; metformin: {has_metformin}", txt[:400])
+except Exception as e:
+    record("vision_prescription_pdf", False, f"exception: {e}")
+    traceback.print_exc()
+
+
 # ------------------------- SUMMARY -------------------------
 section("SUMMARY")
 for r in RESULTS:

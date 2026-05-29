@@ -12,6 +12,7 @@ import json
 import time
 from typing import Any
 
+import pymupdf
 from openai import OpenAI
 
 from backend.ai import prompts
@@ -21,12 +22,15 @@ from backend.ai.provider import (
     CaseSummary,
     DocKind,
     DocumentAnalysis,
+    DocumentReadError,
 )
 from backend.config import get_settings
 
 
 _HISTORY_LIMIT = 3
 _MODEL_VERSION = "2026-05-05"  # gpt-chat-latest from probe; updated when deployment changes
+_PDF_MAX_PAGES = 5
+_PDF_DPI = 200
 
 
 def _sha256(s: str) -> str:
@@ -35,6 +39,25 @@ def _sha256(s: str) -> str:
 
 def _b64(image: bytes) -> str:
     return base64.b64encode(image).decode("ascii")
+
+
+def _data_uris_for(data: bytes, mime: str) -> list[str]:
+    if mime != "application/pdf":
+        return [f"data:{mime};base64,{_b64(data)}"]
+    try:
+        doc = pymupdf.open(stream=data, filetype="pdf")
+    except Exception as e:
+        raise DocumentReadError(
+            "PDF could not be read; file may be encrypted or corrupted"
+        ) from e
+    uris: list[str] = []
+    try:
+        for i in range(min(len(doc), _PDF_MAX_PAGES)):
+            png = doc[i].get_pixmap(dpi=_PDF_DPI).tobytes("png")
+            uris.append(f"data:image/png;base64,{_b64(png)}")
+    finally:
+        doc.close()
+    return uris
 
 
 def _history_block(history: list[DocumentAnalysis]) -> str:
@@ -81,21 +104,20 @@ class AzureOpenAIProvider(AIProvider):
             system_prompt = system_prompt + "\n\n" + _history_block(history)
             prompt_version = f"{prompt_version}+{prompts.HISTORY_PROMPT_VERSION}"
 
-        img_data_uri = f"data:{mime or 'image/png'};base64,{_b64(image_or_pdf_bytes)}"
+        uris = _data_uris_for(image_or_pdf_bytes, mime or "image/png")
         user_text = "এই ডকুমেন্টটি বিশ্লেষণ করো এবং JSON ফেরত দাও।"
+        if len(uris) > 1:
+            user_text += "  (multi-page PDF; analyze all pages as one document)"
+        content_blocks: list[dict] = [{"type": "text", "text": user_text}]
+        for uri in uris:
+            content_blocks.append({"type": "image_url", "image_url": {"url": uri}})
 
         t0 = time.time()
         resp = self._client.chat.completions.create(
             model=self._deployment,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": user_text},
-                        {"type": "image_url", "image_url": {"url": img_data_uri}},
-                    ],
-                },
+                {"role": "user", "content": content_blocks},
             ],
             response_format={"type": "json_object"},
             timeout=60,

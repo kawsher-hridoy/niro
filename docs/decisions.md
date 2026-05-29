@@ -15,6 +15,17 @@ Format per decision:
 
 ---
 
+## D-013 — PyMuPDF for PDF rasterization (AGPL, swap-later)
+
+- **What:** Uploaded `application/pdf` documents are rasterized to PNGs server-side via `pymupdf` (200 DPI, capped at 5 pages) before being sent to Azure OpenAI's vision endpoint as multiple `image_url` content blocks. Image MIMEs (PNG/JPEG/WebP) continue to be sent directly. Failure to decode the PDF surfaces as `DocumentReadError` → HTTP 422 with an `ai.document_unreadable` audit event.
+- **When:** 2026-05-27 (Fix #6, Day-5).
+- **Owner:** kawsher-hridoy
+- **Why:** Azure OpenAI's `image_url` block only accepts PNG/JPEG/GIF/WebP, so PDFs were silently broken end-to-end despite the upload path accepting them. PyMuPDF is the fastest renderer with the best quality output for handwritten Bangladeshi prescriptions; the user picked it explicitly over `pypdfium2` for ICADHI demo speed. Cost vector to watch: a 5-page lab report ≈ 5× single-image vision tokens.
+- **Alternatives considered:** `pypdfium2` (Apache-2.0 + BSD-3, no AGPL trigger — **preferred for any commercial future**; quality difference is invisible to a vision model at 200 DPI). `pdf2image` + Poppler (extra system dep, adds Docker layer). Server-side text extraction for digital PDFs (deferred — vision path already handles them adequately).
+- **Status:** **Provisional.** **Must swap to `pypdfium2` before the first paying patient.** PyMuPDF is licensed AGPL-3.0; the "network use" clause would otherwise require either open-sourcing the entire Niro codebase under AGPL or paying Artifex's commercial license. Acceptable for ICADHI demo (academic showcase, not yet a service offered to users). Tracked as an open question.
+- **Affected files:** `niro/backend/pyproject.toml`, `niro/backend/ai/azure.py`, `niro/backend/ai/provider.py` (`DocumentReadError`), `niro/backend/api/routers/analyses.py`, `niro/probe.py` (TEST 7).
+- **Related:** New OQ in `docs/open-questions.md` tracks the pypdfium2 swap.
+
 ## D-012 — Password hashing via argon2-cffi (not bcrypt, not passlib)
 
 - **What:** User passwords (introduced in Fix #2 — sign-up + password login + reset) are hashed with `argon2-cffi` (`PasswordHasher.hash()` / `.verify()`). Stored in `users.password_hash` (Argon2id, default params: t=3, m=64 MiB, p=4). OTP codes still use `sha256(salt:code)` per D-009.

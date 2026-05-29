@@ -16,7 +16,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from backend.ai.policy import AIPolicyViolation
-from backend.ai.provider import DocumentAnalysis, get_provider
+from backend.ai.provider import DocumentAnalysis, DocumentReadError, get_provider
 from backend.db.models import Analysis, Document, User
 from backend.db.session import get_db
 from backend.services import audit, storage
@@ -107,6 +107,21 @@ def analyze(
             hint_kind=doc.kind,  # type: ignore[arg-type]
             history=history,
         )
+    except DocumentReadError as e:
+        audit.record(
+            db,
+            "ai.document_unreadable",
+            actor_id=user.id,
+            actor_role="patient",
+            patient_id=user.id,
+            document_id=doc.id,
+            detail={"reason": str(e)[:200], "mime": doc.mime_type},
+        )
+        db.commit()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "could not read document; PDF may be encrypted or corrupted",
+        ) from e
     except AIPolicyViolation as e:
         audit.record(
             db,

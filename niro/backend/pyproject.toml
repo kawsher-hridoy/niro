@@ -21,6 +21,7 @@ dependencies = [
     # AI
     "openai>=1.55",
     "pillow>=11.0",
+    "pymupdf>=1.24",
     # Auth / crypto
     "python-jose[cryptography]>=3.3",
     "passlib[bcrypt]>=1.7",
