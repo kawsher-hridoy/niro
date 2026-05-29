@@ -6,12 +6,15 @@ services:
     image: postgres:16.3-alpine3.20
     container_name: niro-postgres
     ports:
-      - "5432:5432"
+      # Bind to loopback only — Postgres is never exposed to the public network.
+      - "127.0.0.1:5432:5432"
     volumes:
       - ./.data/pg:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: niro
-      POSTGRES_PASSWORD: niro
+      # Password comes from /opt/niro/.env (compose ${VAR} interpolation). Dev falls
+      # back to "niro" when POSTGRES_PASSWORD is unset; prod sets it in .env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-niro}
       POSTGRES_DB: niro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U niro -d niro"]
