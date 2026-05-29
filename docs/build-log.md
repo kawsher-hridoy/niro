@@ -282,6 +282,14 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Verified by:** `python3 -m py_compile niro/backend/api/routers/auth.py niro/backend/api/routers/doctor.py niro/backend/api/routers/chamber.py niro/backend/api/routers/profile.py niro/backend/services/auth.py` exits 0. `cd niro/frontend && ./node_modules/.bin/tsc --noEmit` exits 0.
 - **Commit / branch:** `7f3ee31` / `fix/doctor-onboarding-dashboard`.
 
+### Fix #11 — Welcome greeting on dashboards
+
+- **Problem:** The patient home and verified-doctor dashboards greeted the signed-in user with `নমস্কার, {firstName}` ("hello/namaste"). The intended copy is a welcome ("স্বাগতম").
+- **Change:** Replaced the literal `নমস্কার` with `স্বাগতম` on both greeting headings. Two independent hardcoded literals (no shared constant/component), so both files edited.
+- **Files:** `niro/frontend/src/app/(app)/home/page.tsx`, `niro/frontend/src/app/(doctor)/doctor-portal/dashboard/page.tsx`.
+- **Verified by:** `npx tsc --noEmit` exits 0; user confirmed in browser.
+- **Commit / branch:** `cf07c5f` / `fix/welcome-greeting` (squash-merged into `main`, branch deleted).
+
 ### Fix #10 — Suppress body hydration warning from browser extensions
 
 - **Problem:** Browser extensions (Grammarly, dark-mode togglers, password managers) inject attributes onto `<body>` after the server-rendered HTML reaches the browser but before React hydrates. React saw the mismatch and logged a noisy red `Warning: Text content did not match` in the dev console on every page load.
