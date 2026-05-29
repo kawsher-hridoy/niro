@@ -15,6 +15,16 @@ Format per decision:
 
 ---
 
+## D-014 — Document chat + prompt-with-upload (text-grounded, blocking, per-analysis)
+
+- **What:** Two patient-facing additions on top of the AI analysis flow. (1) **Prompt-with-upload** — an optional free-text question on the upload screen, threaded into `analyze_document(... user_prompt=)` so the AI addresses it inside `explanation_bn` (prompt text shapes output, is **not** persisted as its own column in v1; audit records only a `has_user_prompt` bool). (2) **Chat-over-analysis** — a multi-turn Bangla conversation grounded in the stored `Analysis` (structured + explanation + red flags + questions), persisted in two new tables `conversations` (one per analysis) + `chat_messages`, served by `routers/chat.py` (`GET /conversations/{analysis_id}`, `POST /conversations/{analysis_id}/messages`).
+- **When:** 2026-05-29
+- **Owner:** kawsher-hridoy
+- **Why:** Patients want to ask "is this safe / what does this mean" follow-ups without paying for a doctor review. Grounding chat in the **stored analysis** (not a re-sent image) keeps replies fast (~1.5s vs 8–24s) and cheap, and reuses the history-aware infra. Every chat reply still runs `policy.assert_compliant()` and is audited (`ai.chat.message` / `ai.chat.policy_violation`) — same safety contract as analyze. Inline disclaimer on the chat panel satisfies the AI-output-surface rule without resurrecting `DisclaimerBanner` (D-011).
+- **Alternatives considered:** **Vision-enabled chat** (re-send the document each turn so the model can re-read handwriting) — rejected for v1: slow + costly, and the analysis already extracted the content; revisit as an on-demand toggle. **Streaming (SSE)** — rejected: breaks the app's all-blocking sync convention (D-008) for marginal UX. **Cross-record assistant** (chat over the whole timeline) — rejected: bigger build; per-analysis thread matches "chat about THIS report."
+- **Status:** Locked
+- **Affected files:** `niro/backend/db/models.py` (`Conversation`, `ChatMessage`), migration `7c1a9f4b2e10_phase_e_conversations_chat.py` (down_revision `0004_email_password_auth`), `niro/backend/ai/prompts.py` (`CHAT_PROMPT_BN`, `CHAT_PROMPT_VERSION="chat-bn-v1.0"`), `niro/backend/ai/provider.py` (`ChatReply`, `ChatTurn`, `chat_about_analysis` ABC + `user_prompt` on `analyze_document`), `niro/backend/ai/azure.py`, `niro/backend/api/routers/analyses.py` (`AnalyzeIn.user_prompt`), `niro/backend/api/routers/chat.py`, `niro/backend/main.py`, `niro/frontend/src/lib/api.ts`, `niro/frontend/src/components/AnalysisChat.tsx`, `niro/frontend/src/app/(app)/upload/page.tsx`, `niro/frontend/src/app/(app)/analyses/[id]/page.tsx`.
+
 ## D-013 — PyMuPDF for PDF rasterization (AGPL, swap-later)
 
 - **What:** Uploaded `application/pdf` documents are rasterized to PNGs server-side via `pymupdf` (200 DPI, capped at 5 pages) before being sent to Azure OpenAI's vision endpoint as multiple `image_url` content blocks. Image MIMEs (PNG/JPEG/WebP) continue to be sent directly. Failure to decode the PDF surfaces as `DocumentReadError` → HTTP 422 with an `ai.document_unreadable` audit event.

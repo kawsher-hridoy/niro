@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use as usePromise, useEffect, useState } from "react";
 import { apiGet, ApiError, type AnalysisOut, type LabValue, type Medication, type RedFlag } from "@/lib/api";
 import { toBangla } from "@/lib/i18n";
+import AnalysisChat from "@/components/AnalysisChat";
 
 export default function AnalysisDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = usePromise(params);
@@ -122,6 +123,8 @@ export default function AnalysisDetail({ params }: { params: Promise<{ id: strin
           </ul>
         </section>
       )}
+
+      <AnalysisChat analysisId={a.id} />
 
       <footer className="border-t border-[var(--color-card-border)] pt-4 text-xs text-[var(--color-muted)]">
         AI সারাংশ চিকিৎসকের পরামর্শ নয়। মডেল: {a.model_name} ({a.model_version}) · লেটেন্সি: {toBangla(a.latency_ms)} ms

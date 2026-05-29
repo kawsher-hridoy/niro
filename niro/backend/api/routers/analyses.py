@@ -29,6 +29,7 @@ router = APIRouter(prefix="/analyses", tags=["analyses"])
 class AnalyzeIn(BaseModel):
     document_id: uuid.UUID
     use_history: bool = True
+    user_prompt: str | None = Field(default=None, max_length=1000)
 
 
 class AnalysisOut(BaseModel):
@@ -106,6 +107,7 @@ def analyze(
             mime=doc.mime_type,
             hint_kind=doc.kind,  # type: ignore[arg-type]
             history=history,
+            user_prompt=body.user_prompt,
         )
     except DocumentReadError as e:
         audit.record(
@@ -172,6 +174,7 @@ def analyze(
             "latency_ms": result["latency_ms"],
             "history_count": len(history),
             "kind": doc.kind,
+            "has_user_prompt": bool(body.user_prompt and body.user_prompt.strip()),
             "prompt_version": result.get("_prompt_version"),  # type: ignore[typeddict-item]
         },
     )

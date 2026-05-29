@@ -520,3 +520,33 @@ export type ChamberProfileOut = {
     confidence: number;
   } | null;
 };
+
+// ---------- chat about an analysis ----------
+
+export type ChatMessageOut = {
+  id: string;
+  role: "user" | "assistant";
+  content_bn: string;
+  confidence: number | null;
+  recommend_human_review: boolean;
+  created_at: string;
+};
+
+export type ConversationOut = {
+  analysis_id: string;
+  conversation_id: string | null;
+  messages: ChatMessageOut[];
+};
+
+export function getConversation(analysisId: string): Promise<ConversationOut> {
+  return apiGet<ConversationOut>(`/conversations/${analysisId}`);
+}
+
+export function sendChatMessage(
+  analysisId: string,
+  content_bn: string
+): Promise<ChatMessageOut> {
+  return apiPost<ChatMessageOut>(`/conversations/${analysisId}/messages`, {
+    content_bn,
+  });
+}
