@@ -56,6 +56,7 @@ auto-verify for demos.
 - [`frontend/components.md`](frontend/components.md) — actual component inventory as built
 
 ### Deployment
+- [`deployment/deployment.md`](deployment/deployment.md) — **end-to-end Azure VM deploy guide** (provision → system prep → clone → migrate → systemd → Caddy → TLS → smoke test)
 - [`deployment/topology.md`](deployment/topology.md) — local vs prod → `DESIGN.md §10`
 - [`deployment/docker-compose.md`](deployment/docker-compose.md) — local dev compose explained
 - [`deployment/caddy.md`](deployment/caddy.md) — Phase F production Caddyfile

@@ -282,6 +282,15 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Verified by:** `python3 -m py_compile niro/backend/api/routers/auth.py niro/backend/api/routers/doctor.py niro/backend/api/routers/chamber.py niro/backend/api/routers/profile.py niro/backend/services/auth.py` exits 0. `cd niro/frontend && ./node_modules/.bin/tsc --noEmit` exits 0.
 - **Commit / branch:** `7f3ee31` / `fix/doctor-onboarding-dashboard`.
 
+### Deploy #1 — Production live at nirobd.tech + docs sync
+
+- **What happened:** Niro went live on an **Azure VM** at **https://nirobd.tech** (single-domain, path-routed via Caddy: `/api/*`→FastAPI:8000, everything else→Next.js:3000). Two commits authored from the VM (`d2de79d`, `52dd6e0`) added the deploy tooling to `main`: `deploy.sh` (one-command ff-pull + selective rebuild/migrate/restart + health-check), `docs/deployment/Caddyfile`, `niro-backend.service`, `niro-frontend.service`, `niro/frontend/.env.production` (relative `NEXT_PUBLIC_API_BASE=/api/v1`), and a docker-compose tweak (Postgres bound to `127.0.0.1`, password via `${POSTGRES_PASSWORD}`).
+- **Key architecture change:** single-origin ⇒ **no CORS** in prod; the `backend/main.py` CORS allow-list is irrelevant (relative API base). This retires the "edit CORS on the VM" footgun.
+- **Docs synced (this entry's branch):** `topology.md` rewritten for the real Azure single-domain setup (was Hetzner/DO two-subdomain); `deployment.md` (previously uncommitted) given a LIVE banner + obsolete-marks on the §5.6 CORS and §5.7 absolute-URL steps + `deploy.sh` as the canonical §9 update path, then committed to the repo for the first time; `CLAUDE.md` hosting row + a deploy note; `docs/README.md` links the deploy guide.
+- **Verified by:** `deploy.sh` health-checks `nirobd.tech/api/v1/health` on each run; site serves 200 over TLS.
+- **Pending on prod:** Fix #11 (greeting) and the D-014 chat feature are on `main` but only reach nirobd.tech after the next `./deploy.sh` run on the VM. Backups timer + Sentry/uptime monitor still open (see `topology.md`).
+- **Commit / branch:** `docs/deploy-reality` (this doc sync); deploy tooling already on `main` via `d2de79d`/`52dd6e0`.
+
 ### Fix #11 — Welcome greeting on dashboards
 
 - **Problem:** The patient home and verified-doctor dashboards greeted the signed-in user with `নমস্কার, {firstName}` ("hello/namaste"). The intended copy is a welcome ("স্বাগতম").

@@ -54,7 +54,7 @@ analysis page).
 | DB          | `postgres:16.3-alpine3.20` (cached locally — see D-007)                                          | pgvector deferred; Phase 1 has no vector queries                                                                               |
 | Frontend    | **Next.js 16.2.6** (App Router, Turbopack default), React 19.2, Tailwind 4                       | See "Next.js 16 gotchas" below                                                                                                 |
 | Auth        | Patient signup/password login/reset + legacy OTP, doctor application + OTP for seeded doctors, JWT HS256 | Passwords use Argon2id (D-012); OTP storage uses sha256(salt:code) (D-009). Dev doctor applications auto-verify when `APP_ENV != "prod"` |
-| Hosting     | Local dev now, single VPS later (Caddy + systemd)                                                | Phase F4                                                                                                                       |
+| Hosting     | **LIVE: https://nirobd.tech** — Azure VM, single-domain (Caddy path-routes `/api/*`→:8000, else→:3000), systemd | Deploy updates with `./deploy.sh` on the VM. Single-origin ⇒ **no CORS**; relative API base. See `docs/deployment/`. |
 
 ---
 
@@ -316,7 +316,16 @@ docker compose exec postgres psql -U niro -d niro
 # See audit log activity
 docker compose exec -T postgres psql -U niro -d niro \
   -c "SELECT event, count(*) FROM audit_log GROUP BY event ORDER BY count(*) DESC;"
+
+# Deploy latest main to prod (run ON the VM, /opt/niro)
+./deploy.sh                            # ff-pull + selective rebuild/migrate/restart + health-check
 ```
+
+**Prod is live at https://nirobd.tech** (Azure VM, single-domain). Code
+updates: SSH to the VM and run `./deploy.sh` (never touches `.env`,
+no-ops when up to date, refuses on a dirty tree). Single-origin path
+routing means **no CORS config in prod** and a relative `NEXT_PUBLIC_API_BASE`.
+Full guide + Caddyfile/systemd templates in `docs/deployment/`.
 
 ---
 
