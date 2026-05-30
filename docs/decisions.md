@@ -189,3 +189,78 @@ Format per decision:
 
 For larger architectural decisions, also create an ADR in
 [`adr/`](adr/) using [`adr/0001-template.md`](adr/0001-template.md).
+## D-017 — Live /docs module with YC-style pitch deck + admin access control
+
+- **What:** A comprehensive `/docs` endpoint serving as pitch deck, technical documentation, and live system dashboard, with admin-controlled visibility scheduling (default: June 10-14, 2026). Combines YC-style business pitch (Problem, Solution, Market, Business Model, Traction, Competition, Go-To-Market, Team, Vision) with technical documentation (Architecture, Security, AI Safety, Features, Tech Stack, Roadmap) and real-time system statistics. Admin panel at `/docs/admin` provides WYSIWYG editing, team member management, and visibility scheduling with quick presets.
+- **When:** 2026-05-30
+- **Owner:** kawsher-hridoy
+- **Why:** ICADHI judges need a single authoritative source to evaluate Niro during the judging window (June 10-14). Combining business pitch + technical depth + live data in one place is more effective than scattered docs. Admin scheduling allows controlled access for judging, investor preview, or public showcase without code changes. Live stats (total users, documents, analyses, verifications, health metrics, conversations, chamber sessions) demonstrate real system traction. Team section with photos provides human context. Access control prevents premature public exposure before the judging window.
+- **Alternatives considered:** 
+  - **Static Markdown files in `/docs` folder** — rejected: no live data integration, no access control, no admin editing capability
+  - **Separate pitch deck + docs sites** — rejected: fragmented experience, judges would need to visit multiple URLs
+  - **Always-public docs** — rejected: need controlled judging window, don't want competitors seeing full system before demo
+  - **Notion/Google Docs** — rejected: not integrated with live system data, no custom branding
+  - **Docusaurus/VitePress** — rejected: overkill for single-page docs, no access control, no live data
+- **Status:** Locked
+- **Affected files:** 
+  - Backend: `niro/backend/db/models.py` (DocsConfig, DocsSection, DocsTeamMember models), migration `a9b5d9e308af_docs_module_tables.py`, `niro/backend/api/routers/docs.py` (13 endpoints: 8 public, 5 admin), `niro/backend/main.py` (router wiring), `niro/backend/seeds/docs_content.py` (initial content seed)
+  - Frontend: `niro/frontend/src/app/docs/page.tsx` (public view with navigation, live stats, team section), `niro/frontend/src/app/docs/admin/page.tsx` (admin panel with visibility toggle, scheduling, content editing, team management)
+  - Database: 3 new tables (`docs_config`, `docs_sections`, `docs_team_members`), default config row (June 10-14, 2026, is_public=false)
+  - Commit: `751be92`
+
+**Implementation Details:**
+
+**Backend Endpoints:**
+- Public: `GET /docs/config` (availability check), `GET /docs/sections` (content), `GET /docs/team` (team members), `GET /docs/live-stats` (real-time metrics), `GET /docs/features` (feature matrix with counts), `GET /docs/tech-stack` (technology info)
+- Admin: `PATCH /docs/config` (visibility + scheduling), `POST/PATCH/DELETE /docs/sections` (content management), `POST/PATCH/DELETE /docs/team` (team management)
+
+**Access Control Logic:**
+- `is_public` flag (ON/OFF toggle)
+- Optional `start_datetime` and `end_datetime` (time window)
+- Default: June 10-14, 2026 (ICADHI judging window)
+- Admin can override to "always public" or custom windows
+- Quick presets: "ICADHI Judging", "Always Public"
+
+**Live Data Integration:**
+- Total users, patients, verified doctors
+- Documents uploaded, AI analyses performed
+- Doctor verifications completed
+- Average AI confidence score
+- Health metrics extracted
+- Conversations (document chat)
+- Chamber sessions conducted
+- All stats fetched in real-time from database
+
+**Frontend Features:**
+- Sticky navigation sidebar with section jump links
+- YC-style pitch deck sections (Problem → Vision)
+- Team section with photo grid (uniform styling, fallback avatars)
+- Live statistics dashboard (8 metric cards)
+- Feature matrix with status badges (live/beta/planned) + counts
+- Tech stack by category (Frontend, Backend, Database, AI, Infrastructure)
+- Markdown-to-HTML rendering for content sections
+- PDF export via `window.print()` (consistent with D-010)
+- Mobile responsive design
+- "Not Available" page when outside time window
+
+**Admin Panel Features:**
+- Three tabs: Visibility & Scheduling, Content Sections, Team Members
+- Visibility toggle (Public/Private) with live status indicator
+- Date/time pickers for scheduling window
+- Quick preset buttons (ICADHI Judging, Always Public)
+- Section editing with textarea (Markdown support)
+- Team member CRUD with photo URL field
+- Save/Cancel workflow for all edits
+- Preview link to public docs page
+
+**Seed Data:**
+- 13 documentation sections (Problem, Solution, Why Now, Market, Business Model, Traction, Competition, Go-To-Market, Vision, Architecture, Security, AI Safety, Roadmap)
+- 1 team member (placeholder for kawsher-hridoy)
+- Content sourced from PROJECT.md, DESIGN.md, docs/build-log.md
+
+**Use Cases:**
+- **ICADHI Judging (June 10-14)**: Judges visit `/docs` during window, see full pitch + technical depth + live stats
+- **Investor Preview**: Admin sets custom window (e.g., June 1-5), shares link with investors
+- **Public Showcase**: Admin toggles "Always Public" after demo day
+- **Team Editing**: Admin updates team photos, roles, adds new members as team grows
+- **Content Updates**: Admin edits sections to reflect new features, updated metrics, roadmap changes
