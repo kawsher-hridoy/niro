@@ -19,9 +19,12 @@ by the user — branch per issue, squash-merge after approval) until
 password auth, the authenticated app shell, patient dashboard, doctor
 onboarding, the verified-doctor dashboard, and PDF vision support
 (Fix #8 — PyMuPDF rasterization at 200 DPI, 5-page cap, AGPL caveat
-tracked as OQ-17). The first post-Phase-1 **feature** also merged:
+tracked as OQ-17). Three post-Phase-1 **features** have merged:
 document chat + prompt-with-upload (D-014, PR #8 — text-grounded chat
-over an analyzed document, plus an optional prompt on upload).
+over an analyzed document, plus an optional prompt on upload); and the
+longitudinal medical-profile layer (D-015 + D-016, commit `5f853a4` —
+report-type records, trendable health metrics, `/records` + `/trends`
+pages, doctor case-view metrics + consent-gated hardcopy download).
 Live-demo polish (post-30 May if shortlisted) follows.
 
 ---

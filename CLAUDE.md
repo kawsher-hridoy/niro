@@ -35,11 +35,14 @@ fixes loop, currently active — see "Issue-fix workflow" section below).
 Day-5 fixes already shipped the public landing rebuild, SaaS auth, the
 authenticated patient shell/dashboard, the doctor onboarding +
 verified-doctor dashboard, and PDF vision support (Fix #8 — PyMuPDF
-rasterization at 200 DPI, 5-page cap). The first post-Phase-1 **feature**
-(not a fix) also merged: document chat + prompt-with-upload (D-014,
+rasterization at 200 DPI, 5-page cap). Three post-Phase-1 **features**
+(not fixes) have merged: document chat + prompt-with-upload (D-014,
 PR #8 — `conversations`/`chat_messages` tables, `/api/v1/conversations`
 router, `chat_about_analysis` provider method, chat panel on the
-analysis page).
+analysis page); and the longitudinal medical-profile layer (D-015 +
+D-016, commit `5f853a4` — report-type records, original-file download,
+trendable `health_metrics`, `/records` + `/trends` pages, doctor
+case-view metrics + consent-gated hardcopy download).
 
 ---
 
@@ -173,7 +176,7 @@ single switch point.
     │   │   ├── base.py
     │   │   ├── session.py        # sync engine + SessionLocal + get_db
     │   │   ├── models.py         # current SQLAlchemy models
-    │   │   └── migrations/       # revisions through 7c1a9f4b2e10 (phase E: chat)
+    │   │   └── migrations/       # revisions through c5f4e8d20a17 (phase E: health_metrics)
     │   ├── ai/
     │   │   ├── provider.py       # AIProvider ABC + factory
     │   │   ├── azure.py          # AzureOpenAIProvider concrete impl
@@ -186,10 +189,10 @@ single switch point.
     │   │   └── auth.py           # JWT, password hashing, current_user, role/verified-doctor deps
     │   ├── api/routers/
     │   │   ├── auth.py           # signup, password login/reset, doctor apply, OTP, refresh/logout
-    │   │   ├── documents.py      # upload, list, get, delete
-    │   │   ├── analyses.py       # AI analyze (history-aware, optional user_prompt) + list + get
+    │   │   ├── documents.py      # upload, list, get, delete, download (consent-gated for doctors — D-015)
+    │   │   ├── analyses.py       # AI analyze (history-aware, user_prompt, report_type/date + metric extraction) + list + get
     │   │   ├── chat.py           # per-analysis conversation: get thread, post message (D-014)
-    │   │   ├── profile.py        # /me, /me/dashboard, /timeline, /access-log, DELETE /me
+    │   │   ├── profile.py        # /me, /me/dashboard, /timeline, /access-log, /me/records, /me/metrics(+/{key}), DELETE /me
     │   │   ├── consent.py        # grant, revoke
     │   │   ├── verifications.py  # request, mock-pay, list, get
     │   │   ├── doctor.py         # status, dashboard, inbox, case view (consent-gated), submit review
@@ -207,6 +210,8 @@ single switch point.
             │   ├── signin/, signin/otp/, verify/, forgot-password/
             │   ├── (app)/layout.tsx                    # patient authenticated shell
             │   ├── (app)/home/, upload/, timeline/, access-log/
+            │   ├── (app)/records/, (app)/records/[type]/    # health records grouped by report_type (D-015)
+            │   ├── (app)/trends/, (app)/trends/[key]/       # health-metric trends + inline-SVG chart (D-016)
             │   ├── (app)/analyses/[id]/ (PDF via window.print + chat panel — D-014)
             │   ├── (app)/doctors/, (app)/doctors/[id]/
             │   ├── (app)/verifications/, (app)/verifications/[id]/ (auto-poll)
@@ -243,6 +248,8 @@ single switch point.
 | **D-012** | Password hashing via Argon2id (`argon2-cffi`) | `services/auth.py`, `routers/auth.py`, migration `0004` |
 | **D-013** | PDF rasterization via PyMuPDF (AGPL, swap to pypdfium2 before commercial launch — see OQ-17) | `backend/ai/azure.py` (`_data_uris_for`, `_PDF_MAX_PAGES=5`, `_PDF_DPI=200`), `backend/ai/provider.py` (`DocumentReadError`), `backend/api/routers/analyses.py` |
 | **D-014** | Document chat + prompt-with-upload: text-grounded (reads stored analysis, not re-sent image), blocking, one conversation per analysis | `backend/db/models.py` (`Conversation`, `ChatMessage`), migration `7c1a9f4b2e10`, `backend/ai/prompts.py` (`CHAT_PROMPT_BN`), `backend/ai/azure.py` (`chat_about_analysis`), `backend/api/routers/chat.py`, `frontend/src/components/AnalysisChat.tsx` |
+| **D-015** | Report-type-aware health records + original-file download: AI classifies fine-grained `report_type` + `report_date` onto `Analysis`; `/me/records` groups by type; `/documents/{id}/download` (patient-owner direct, doctor consent-gated) | `backend/db/models.py` (`Analysis.report_type`/`report_date`), migration `b3e2d7a91c44`, `backend/ai/azure.py` (`_clean_report_type`/`_clean_iso_date`), `backend/api/routers/{analyses,documents,profile}.py`, `frontend/src/app/(app)/records/`, `frontend/src/lib/api.ts` (`getRecords`, `downloadDocument`) |
+| **D-016** | Health-metrics trend layer: lab values extracted into `health_metrics` (canonical `metric_key` vocabulary, numeric value + ref range, forward-only); `/me/metrics`(+`/{key}`) with computed directional trend insight; `/trends` pages + inline-SVG chart; doctor case-view metrics | `backend/db/models.py` (`HealthMetric`), migration `c5f4e8d20a17`, `backend/ai/prompts.py` (lab-bn-v1.2), `backend/api/routers/{analyses,profile,doctor}.py`, `frontend/src/app/(app)/trends/`, `frontend/src/app/(app)/home/page.tsx` (`HealthMetricsWidget`), `frontend/src/lib/api.ts` (`getMetrics`, `getMetricHistory`) |
 
 See `docs/decisions.md` for rationale + alternatives on each.
 
@@ -291,7 +298,7 @@ docker compose up -d postgres
 # Backend (terminal 1)
 cd niro
 source .venv/bin/activate
-alembic -c alembic.ini upgrade head    # current head: 7c1a9f4b2e10
+alembic -c alembic.ini upgrade head    # current head: c5f4e8d20a17
 python -m backend.seeds.doctors        # idempotent; seeds 6 doctors
 uvicorn backend.main:app --reload --port 8000
 

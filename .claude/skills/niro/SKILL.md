@@ -1,6 +1,6 @@
 ---
 name: niro
-description: Use when working on the Niro health-app codebase — implementing features, debugging the AI provider integration, reasoning about ICADHI submission constraints, or extending the current FastAPI/Next.js codebase. Reflects state as of Day-5 Fix #8 + the D-014 document-chat feature: SaaS auth, app shell, patient dashboard, doctor onboarding, verified-doctor dashboard, PDF vision support, and per-analysis AI chat + prompt-with-upload are merged; iterative issue-fix loop active.
+description: Use when working on the Niro health-app codebase — implementing features, debugging the AI provider integration, reasoning about ICADHI submission constraints, or extending the current FastAPI/Next.js codebase. Reflects state as of Day-5 Fix #8 + three post-Phase-1 features: SaaS auth, app shell, patient dashboard, doctor onboarding, verified-doctor dashboard, PDF vision support, per-analysis AI chat + prompt-with-upload (D-014), and the longitudinal medical-profile layer (D-015 + D-016: report-type records, trendable health metrics, /records + /trends pages, doctor case-view metrics) are merged; iterative issue-fix loop active.
 ---
 
 # Niro project skill
@@ -28,7 +28,7 @@ Live engineering docs: `docs/` folder.
 | B — AI integration + upload path | ✅ Merged (PR #2) |
 | C — Profile + verification + doctor portal | ✅ Merged (PR #3) |
 | D — Chamber QR + browser PDF + polish | ✅ Merged (PR #4) |
-| **Day 5 — iterative issue fixes** | 🔧 **Active** — Fix #1 landing, Fix #2 SaaS auth, Fix #3 app shell/dashboard, Fix #4 doctor onboarding/dashboard, Fix #8 PDF vision support merged; **Feature #1 (D-014) document chat + prompt-with-upload merged (PR #8)** |
+| **Day 5 — iterative issue fixes** | 🔧 **Active** — Fix #1 landing, Fix #2 SaaS auth, Fix #3 app shell/dashboard, Fix #4 doctor onboarding/dashboard, Fix #8 PDF vision support merged; **Features: D-014 document chat (PR #8), D-015 + D-016 health-records + trends (commit 5f853a4) merged** |
 | **E — Video submission** | ⏳ **User action** — record + upload by 27 May |
 | F — Live-demo polish + VPS deploy | Conditional on 30 May shortlist |
 | G — Demo day | 15 June |
@@ -71,6 +71,8 @@ Read `docs/build-log.md` Day 4 first, then Day 5 for the active fix loop.
 | D-012 | Password hashing via Argon2id (`argon2-cffi`) | Locked |
 | D-013 | PDF rasterization via PyMuPDF (200 DPI, 5-page cap) before vision call | Provisional — swap to `pypdfium2` before commercial launch (OQ-17, AGPL) |
 | D-014 | Document chat + prompt-with-upload: text-grounded, blocking, one conversation per analysis | Locked |
+| D-015 | Report-type-aware health records + original-file download: AI classifies `report_type` + `report_date`; `/me/records` groups by type; consent-gated download | Locked |
+| D-016 | Health-metrics trend layer: lab values → `health_metrics` table (canonical `metric_key`, numeric extraction); `/me/metrics` + `/trends` pages with directional insight | Locked |
 
 Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also need an ADR.
 
@@ -101,16 +103,18 @@ Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also nee
 | `28e9c4a069e8` (Phase C) | verification_requests, verification_reviews, doctor_reviews, chamber_sessions |
 | `0004_email_password_auth` (Fix #2) | email/password auth fields, pending_signups, otp purpose |
 | `7c1a9f4b2e10` (Feature #1, D-014) | conversations, chat_messages |
+| `b3e2d7a91c44` (Feature #2, D-015) | Analysis.report_type, Analysis.report_date, index ix_analyses_patient_reporttype_date |
+| `c5f4e8d20a17` (Feature #3, D-016) | health_metrics table, index ix_health_metrics_patient_key_date |
 
 ### Backend (41 router endpoints + health)
 
 | Module | Routes |
 |---|---|
 | `routers/auth.py` | signup, signup verify/resend, doctor apply, password login/reset, legacy OTP login, refresh, logout |
-| `routers/documents.py` | `POST /documents`, `GET /documents`, `GET /documents/{id}`, `DELETE /documents/{id}` |
-| `routers/analyses.py` | `POST /analyses` (with `use_history`, optional `user_prompt`), `GET /analyses/{id}`, `GET /analyses` |
+| `routers/documents.py` | `POST /documents`, `GET /documents`, `GET /documents/{id}`, `DELETE /documents/{id}`, `GET /documents/{id}/download` (consent-gated for doctors, D-015) |
+| `routers/analyses.py` | `POST /analyses` (with `use_history`, optional `user_prompt`, extracts report_type/date + health_metrics), `GET /analyses/{id}`, `GET /analyses` |
 | `routers/chat.py` | `GET /conversations/{analysis_id}`, `POST /conversations/{analysis_id}/messages` (per-analysis AI chat, D-014) |
-| `routers/profile.py` | `GET /me`, `PATCH /me`, `GET /me/dashboard`, `GET /me/timeline`, `GET /me/access-log`, `DELETE /me` |
+| `routers/profile.py` | `GET /me`, `PATCH /me`, `GET /me/dashboard`, `GET /me/timeline`, `GET /me/access-log`, `GET /me/records` (D-015), `GET /me/metrics`, `GET /me/metrics/{key}` (D-016), `DELETE /me` |
 | `routers/consent.py` | `POST /consents`, `POST /consents/{id}/revoke` |
 | `routers/verifications.py` | `POST /verifications`, `POST /verifications/{id}/pay`, `GET /verifications`, `GET /verifications/{id}` |
 | `routers/doctor.py` | `GET /doctor/status`, `GET /doctor/dashboard`, `GET /doctor/inbox`, `GET /doctor/cases/{id}`, `POST /doctor/cases/{id}/review` |
@@ -144,7 +148,9 @@ Adding new D-NNN: append to `docs/decisions.md`. Load-bearing decisions also nee
 | `app/signin/`, `app/signin/otp/`, `app/verify/`, `app/forgot-password/` | patient signup/password login/reset, legacy OTP, doctor application |
 | `app/(app)/home/` | Patient SaaS dashboard inside authenticated shell |
 | `app/upload/` | File picker + auto-analyze (supports `?document=` re-analyze) + optional প্রশ্ন textarea threaded into the analyze call (D-014) |
-| `app/analyses/[id]/` | Result view + 🖨 PDF (browser print) + `<AnalysisChat>` panel (D-014) — handles async `params` via `use(params)` |
+| `app/analyses/[id]/` | Result view + 🖨 PDF (browser print) + `<AnalysisChat>` panel (D-014) + মূল ফাইল download button — handles async `params` via `use(params)` |
+| `app/records/`, `app/records/[type]/` | Health records grouped by report_type (D-015) — chronological list with download + analysis links |
+| `app/trends/`, `app/trends/[key]/` | Health-metric trends (D-016) — cards + inline-SVG line chart with reference band, value table, directional insight |
 | `app/timeline/` | Vertical timeline of all events |
 | `app/doctors/`, `app/doctors/[id]/` | Directory + filter + profile + request CTA |
 | `app/verifications/`, `app/verifications/[id]/` | List + detail with auto-poll while doctor reviews |
