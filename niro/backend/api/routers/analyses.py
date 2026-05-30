@@ -450,3 +450,28 @@ def list_my_analyses(
         .order_by(desc(Analysis.created_at))
     ).all()
     return [AnalysisOut.from_orm(a, kind) for a, kind in rows]
+
+
+class LatestAnalysisRef(BaseModel):
+    id: uuid.UUID
+    created_at: datetime
+
+
+@router.get("/by-document/{document_id}/latest", response_model=LatestAnalysisRef)
+def latest_for_document(
+    document_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_patient),
+) -> LatestAnalysisRef:
+    """Cheap lookup so the upload page can poll for a result if its long
+    POST /analyses connection was dropped by a flaky network mid-call."""
+    row = db.execute(
+        select(Analysis.id, Analysis.created_at)
+        .join(Document, Document.id == Analysis.document_id)
+        .where(Analysis.document_id == document_id, Analysis.patient_id == user.id)
+        .order_by(desc(Analysis.created_at))
+        .limit(1)
+    ).first()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no analysis yet")
+    return LatestAnalysisRef(id=row.id, created_at=row.created_at)

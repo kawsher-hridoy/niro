@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { apiPost, apiUpload, ApiError, type AnalysisOut, type DocumentOut } from "@/lib/api";
+import { apiGet, apiPost, apiUpload, ApiError, type AnalysisOut, type DocumentOut } from "@/lib/api";
 
 function UploadForm() {
   const router = useRouter();
@@ -19,6 +19,9 @@ function UploadForm() {
 
   async function analyzeDoc(documentId: string, userPrompt?: string) {
     setPhase("analyzing");
+    // Baseline so polling only matches an analysis created by THIS request
+    // (re-analyze can have older analyses on the same document).
+    const startedAt = Date.now();
     try {
       const a = await apiPost<AnalysisOut>("/analyses", {
         document_id: documentId,
@@ -27,9 +30,44 @@ function UploadForm() {
       });
       router.replace(`/analyses/${a.id}`);
     } catch (e) {
-      setErr(formatErr(e));
-      setPhase("pick");
+      // A real API error (422 policy/unreadable, 404, etc.) is final — show it.
+      if (e instanceof ApiError) {
+        setErr(formatErr(e));
+        setPhase("pick");
+        return;
+      }
+      // Otherwise it's a network drop ("TypeError: Failed to fetch"): the AI call
+      // takes ~20s and flaky mobile networks kill the silent connection. The
+      // backend still finishes and saves the analysis, so poll for it.
+      const found = await pollForAnalysis(documentId, startedAt);
+      if (found) {
+        router.replace(`/analyses/${found}`);
+      } else {
+        setErr("নেটওয়ার্ক ধীর — বিশ্লেষণ সম্পন্ন হয়নি। আবার চেষ্টা করুন।");
+        setPhase("pick");
+      }
     }
+  }
+
+  // Poll the cheap lookup endpoint until the analysis for this document appears
+  // (created at/after we started). Short requests survive flaky networks.
+  async function pollForAnalysis(documentId: string, startedAt: number): Promise<string | null> {
+    const deadline = Date.now() + 90_000; // give the AI call up to 90s
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 2500));
+      try {
+        const ref = await apiGet<{ id: string; created_at: string }>(
+          `/analyses/by-document/${documentId}/latest`,
+        );
+        // Accept only an analysis fresh enough to be from this attempt.
+        if (new Date(ref.created_at).getTime() >= startedAt - 5_000) {
+          return ref.id;
+        }
+      } catch {
+        // 404 (not ready yet) or a transient drop — keep polling.
+      }
+    }
+    return null;
   }
 
   useEffect(() => {
