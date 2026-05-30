@@ -84,9 +84,11 @@ def _email_hash_short(email: str) -> str:
 
 
 def _normalize_phone(phone: str) -> str:
-    p = phone.strip().replace(" ", "")
+    """Normalize phone to E.164. Bangladesh-only: prepend +88 if no country code."""
+    p = phone.strip().replace(" ", "").replace("-", "")
     if not p.startswith("+"):
-        p = "+" + p
+        # No country code → assume Bangladesh (+88)
+        p = "+88" + p.lstrip("0")  # strip leading 0 (BD mobile format is 01711... → +8801711...)
     return p
 
 

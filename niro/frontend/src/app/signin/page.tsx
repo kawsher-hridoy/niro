@@ -107,7 +107,7 @@ function SignInForm() {
         type="text"
         value={identifier}
         onChange={setIdentifier}
-        placeholder="+8801XXXXXXXXX বা you@example.com"
+        placeholder="01XXXXXXXXX বা you@example.com"
         autoComplete="username"
         required
         error={fieldErrs.identifier}
@@ -145,7 +145,7 @@ function DoctorApplyForm() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("+8801");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [bmdcNumber, setBmdcNumber] = useState("");
@@ -196,7 +196,7 @@ function DoctorApplyForm() {
       {topError && <TopError>{translateAuthError(topError)}</TopError>}
       <Field label="ডাক্তার নাম" type="text" value={fullName} onChange={setFullName} placeholder="যেমন: ডা. করিম" autoComplete="name" required error={fieldErrs.full_name} />
       <Field label="ইমেইল" type="email" value={email} onChange={setEmail} placeholder="doctor@example.com" autoComplete="email" required error={fieldErrs.email} />
-      <Field label="ফোন নম্বর" type="tel" inputMode="tel" value={phone} onChange={setPhone} placeholder="+8801XXXXXXXXX" autoComplete="tel" required error={fieldErrs.phone} />
+      <Field label="ফোন নম্বর" type="tel" inputMode="tel" value={phone} onChange={setPhone} placeholder="01XXXXXXXXX বা +8801XXXXXXXXX" autoComplete="tel" required error={fieldErrs.phone} />
       <Field label="BMDC নম্বর" type="text" value={bmdcNumber} onChange={setBmdcNumber} placeholder="BMDC-12345" required error={fieldErrs.bmdc_number} />
       <Field label="বিশেষত্ব (কমা দিয়ে)" type="text" value={specialties} onChange={setSpecialties} placeholder="medicine, cardiology" required error={fieldErrs.specialties} />
       <Field label="চেম্বারের নাম" type="text" value={chamberName} onChange={setChamberName} placeholder="Popular Diagnostic Centre" required />
@@ -227,7 +227,7 @@ function SignUpForm() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("+8801");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -291,7 +291,7 @@ function SignUpForm() {
         inputMode="tel"
         value={phone}
         onChange={setPhone}
-        placeholder="+8801XXXXXXXXX"
+        placeholder="01XXXXXXXXX বা +8801XXXXXXXXX"
         autoComplete="tel"
         required
         error={fieldErrs.phone}

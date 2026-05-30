@@ -7,7 +7,7 @@ import { authApi, parseAuthError } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
-  const [phone, setPhone] = useState("+8801");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +64,7 @@ export default function ForgotPasswordPage() {
               inputMode="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="+8801XXXXXXXXX"
+              placeholder="01XXXXXXXXX বা +8801XXXXXXXXX"
               autoComplete="tel"
               required
               className="border border-[var(--color-card-border)] rounded-lg px-4 py-2.5 bg-[var(--color-background)] text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
