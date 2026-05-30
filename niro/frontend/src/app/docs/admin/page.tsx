@@ -16,7 +16,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { loadSession } from "@/lib/api";
+import { API_BASE, loadSession } from "@/lib/api";
 
 interface DocsConfig {
   is_available: boolean;
@@ -72,9 +72,9 @@ export default function DocsAdminPage() {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [configRes, sectionsRes, teamRes] = await Promise.all([
-        fetch("/api/v1/docs/config", { headers }),
-        fetch("/api/v1/docs/sections", { headers }).catch(() => null),
-        fetch("/api/v1/docs/team", { headers }).catch(() => null),
+        fetch(`${API_BASE}/docs/config`, { headers }),
+        fetch(`${API_BASE}/docs/sections`, { headers }).catch(() => null),
+        fetch(`${API_BASE}/docs/team`, { headers }).catch(() => null),
       ]);
 
       setConfig(await configRes.json());
@@ -93,7 +93,7 @@ export default function DocsAdminPage() {
       const token = loadSession()?.access;
       if (!token) return;
 
-      const res = await fetch("/api/v1/docs/config", {
+      const res = await fetch(`${API_BASE}/docs/config`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -123,7 +123,7 @@ export default function DocsAdminPage() {
       const token = loadSession()?.access;
       if (!token) return;
 
-      const res = await fetch(`/api/v1/docs/sections/${section.section_key}`, {
+      const res = await fetch(`${API_BASE}/docs/sections/${section.section_key}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -157,7 +157,7 @@ export default function DocsAdminPage() {
       const token = loadSession()?.access;
       if (!token) return;
 
-      const res = await fetch(`/api/v1/docs/team/${member.id}`, {
+      const res = await fetch(`${API_BASE}/docs/team/${member.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -195,7 +195,7 @@ export default function DocsAdminPage() {
       const token = loadSession()?.access;
       if (!token) return;
 
-      const res = await fetch(`/api/v1/docs/team/${id}`, {
+      const res = await fetch(`${API_BASE}/docs/team/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

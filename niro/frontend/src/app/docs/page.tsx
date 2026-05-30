@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import { toBangla } from "@/lib/i18n";
+import { API_BASE } from "@/lib/api";
 
 interface DocsConfig {
   is_available: boolean;
@@ -85,7 +86,7 @@ export default function DocsPage() {
   const fetchDocsData = async () => {
     try {
       // Check availability first
-      const configRes = await fetch("/api/v1/docs/config");
+      const configRes = await fetch(`${API_BASE}/docs/config`);
       const configData: DocsConfig = await configRes.json();
       setConfig(configData);
 
@@ -96,11 +97,11 @@ export default function DocsPage() {
 
       // Fetch all docs data in parallel
       const [sectionsRes, teamRes, statsRes, featuresRes, techStackRes] = await Promise.all([
-        fetch("/api/v1/docs/sections"),
-        fetch("/api/v1/docs/team"),
-        fetch("/api/v1/docs/live-stats"),
-        fetch("/api/v1/docs/features"),
-        fetch("/api/v1/docs/tech-stack"),
+        fetch(`${API_BASE}/docs/sections`),
+        fetch(`${API_BASE}/docs/team`),
+        fetch(`${API_BASE}/docs/live-stats`),
+        fetch(`${API_BASE}/docs/features`),
+        fetch(`${API_BASE}/docs/tech-stack`),
       ]);
 
       setSections(await sectionsRes.json());
