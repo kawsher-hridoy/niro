@@ -22,6 +22,7 @@ from backend.api.routers import (
     doctor as doctor_router,
     doctors,
     documents,
+    docs,
     profile,
     verifications,
 )
@@ -90,3 +91,4 @@ app.include_router(verifications.router, prefix="/api/v1")
 app.include_router(doctor_router.router, prefix="/api/v1")
 app.include_router(doctors.router, prefix="/api/v1")
 app.include_router(chamber.router, prefix="/api/v1")
+app.include_router(docs.router, prefix="/api/v1")
