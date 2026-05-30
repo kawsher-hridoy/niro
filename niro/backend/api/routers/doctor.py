@@ -19,6 +19,7 @@ from backend.db.models import (
     Analysis,
     Document,
     DoctorProfile,
+    HealthMetric,
     User,
     VerificationRequest,
     VerificationReview,
@@ -246,6 +247,7 @@ class CaseView(BaseModel):
     analysis: dict | None = None  # the most recent Analysis on the target document
     case_summary: dict | None = None  # AI-prepared case summary
     history: list[dict] = []  # previous analyses summary
+    metrics: list[dict] = []  # trendable health metrics across the patient's record
     consent_id: str
 
 
@@ -386,6 +388,33 @@ def get_case(
     )
     db.commit()
 
+    # Trendable metrics across the patient's whole record (latest per key) so the
+    # doctor sees how key values have moved, and can verify against the hardcopy.
+    metric_rows = db.execute(
+        select(HealthMetric)
+        .where(HealthMetric.patient_id == req.patient_id)
+        .order_by(HealthMetric.metric_key)
+    ).scalars().all()
+    by_key: dict[str, list[HealthMetric]] = {}
+    for m in metric_rows:
+        by_key.setdefault(m.metric_key, []).append(m)
+    metrics: list[dict] = []
+    for key, ms in by_key.items():
+        ms.sort(key=lambda x: (x.measured_at or x.created_at.date()).isoformat())
+        latest = ms[-1]
+        metrics.append(
+            {
+                "metric_key": key,
+                "label_bn": latest.label_bn or key.replace("_", " ").title(),
+                "latest_value": float(latest.value_num) if latest.value_num is not None else None,
+                "unit": latest.unit,
+                "latest_date": latest.measured_at.isoformat() if latest.measured_at else None,
+                "count": len(ms),
+                "abnormal": bool(latest.abnormal),
+                "document_id": str(latest.document_id) if latest.document_id else None,
+            }
+        )
+
     return CaseView(
         request_id=str(req.id),
         patient_id=str(req.patient_id),
@@ -406,6 +435,7 @@ def get_case(
         ),
         case_summary=case_summary,
         history=history,
+        metrics=metrics,
         consent_id=str(consent.id),
     )
 

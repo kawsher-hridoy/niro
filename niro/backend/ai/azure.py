@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import time
 from typing import Any
 
@@ -37,6 +38,26 @@ _PDF_DPI = 200
 
 def _sha256(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+_REPORT_TYPE_RE = re.compile(r"[^a-z0-9_]+")
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _clean_report_type(value: Any) -> str | None:
+    """Normalize the model's report_type to a lowercase snake_case slug, or None."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    slug = _REPORT_TYPE_RE.sub("_", value.strip().lower()).strip("_")
+    return slug[:64] or None
+
+
+def _clean_iso_date(value: Any) -> str | None:
+    """Accept only a well-formed YYYY-MM-DD string; reject anything else."""
+    if not isinstance(value, str):
+        return None
+    v = value.strip()
+    return v if _ISO_DATE_RE.match(v) else None
 
 
 def _b64(image: bytes) -> str:
@@ -141,6 +162,8 @@ class AzureOpenAIProvider(AIProvider):
 
         analysis: DocumentAnalysis = {
             "kind": kind,
+            "report_type": _clean_report_type(data.get("report_type")),
+            "report_date": _clean_iso_date(data.get("report_date")),
             "structured": data.get("structured", {}) or data,  # some models inline-flatten
             "explanation_bn": data.get("explanation_bn", "") or "",
             "red_flags": data.get("red_flags", []) or [],

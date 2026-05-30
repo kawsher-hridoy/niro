@@ -38,6 +38,10 @@ class StructuredLabValue(TypedDict, total=False):
     unit: str | None
     reference: str | None
     abnormal: bool
+    metric_key: str | None
+    value_num: float | None
+    ref_low: float | None
+    ref_high: float | None
 
 
 class RedFlag(TypedDict, total=False):
@@ -47,6 +51,8 @@ class RedFlag(TypedDict, total=False):
 
 class DocumentAnalysis(TypedDict, total=False):
     kind: DocKind
+    report_type: str | None
+    report_date: str | None
     structured: dict
     explanation_bn: str
     red_flags: list[RedFlag]

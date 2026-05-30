@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use as usePromise, useEffect, useState } from "react";
-import { apiGet, ApiError, type AnalysisOut, type LabValue, type Medication, type RedFlag } from "@/lib/api";
+import { apiGet, ApiError, downloadDocument, type AnalysisOut, type LabValue, type Medication, type RedFlag } from "@/lib/api";
 import { toBangla } from "@/lib/i18n";
 import AnalysisChat from "@/components/AnalysisChat";
 
@@ -11,6 +11,7 @@ export default function AnalysisDetail({ params }: { params: Promise<{ id: strin
   const [a, setA] = useState<AnalysisOut | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     apiGet<AnalysisOut>(`/analyses/${id}`)
@@ -32,13 +33,34 @@ export default function AnalysisDetail({ params }: { params: Promise<{ id: strin
         <div>
           <h1 className="text-2xl font-semibold text-[var(--color-foreground)]">{kindLabelBn(a.kind)} — AI বিশ্লেষণ</h1>
           <p className="mt-1 text-sm text-[var(--color-muted)]">AI-এর সারাংশ, সতর্কতা, ও কাঠামোবদ্ধ তথ্য।</p>
+          {a.report_date && (
+            <p className="mt-1 text-sm text-[var(--color-muted)]">রিপোর্টের তারিখ: {toBangla(a.report_date)}</p>
+          )}
         </div>
-        <button
-          onClick={() => window.print()}
-          className="rounded-lg border border-[var(--color-card-border)] px-3 py-2 text-sm hover:bg-[var(--color-background)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
-        >
-          PDF
-        </button>
+        <div className="flex items-center gap-2 print:hidden">
+          <button
+            onClick={async () => {
+              setDownloading(true);
+              try {
+                await downloadDocument(a.document_id);
+              } catch {
+                setErr("ফাইল ডাউনলোড করা যায়নি।");
+              } finally {
+                setDownloading(false);
+              }
+            }}
+            disabled={downloading}
+            className="rounded-lg border border-[var(--color-card-border)] px-3 py-2 text-sm hover:bg-[var(--color-background)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 disabled:opacity-50"
+          >
+            {downloading ? "..." : "মূল ফাইল"}
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="rounded-lg border border-[var(--color-card-border)] px-3 py-2 text-sm hover:bg-[var(--color-background)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
+          >
+            PDF
+          </button>
+        </div>
       </header>
 
       {a.recommend_human_review && (

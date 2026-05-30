@@ -7,7 +7,7 @@ last 3 analyses as context.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,13 +17,228 @@ from sqlalchemy.orm import Session
 
 from backend.ai.policy import AIPolicyViolation
 from backend.ai.provider import DocumentAnalysis, DocumentReadError, get_provider
-from backend.db.models import Analysis, Document, User
+from backend.db.models import Analysis, Document, HealthMetric, User
 from backend.db.session import get_db
 from backend.services import audit, storage
 from backend.services.auth import current_user, require_patient
 
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
+
+
+# Bangla labels for the canonical metric keys the lab prompt may emit.
+METRIC_LABEL_BN: dict[str, str] = {
+    "blood_glucose_fasting": "রক্তে শর্করা (উপবাস)",
+    "blood_glucose_random": "রক্তে শর্করা (যেকোনো সময়)",
+    "blood_glucose_2hpp": "রক্তে শর্করা (খাবারের ২ ঘণ্টা পর)",
+    "hba1c": "এইচবিএ১সি",
+    "ldl_cholesterol": "এলডিএল কোলেস্টেরল",
+    "hdl_cholesterol": "এইচডিএল কোলেস্টেরল",
+    "total_cholesterol": "মোট কোলেস্টেরল",
+    "triglycerides": "ট্রাইগ্লিসারাইড",
+    "creatinine": "ক্রিয়েটিনিন",
+    "egfr": "ইজিএফআর",
+    "urea": "ইউরিয়া",
+    "hemoglobin": "হিমোগ্লোবিন",
+    "wbc": "শ্বেত রক্তকণিকা",
+    "platelet": "অণুচক্রিকা (প্লাটিলেট)",
+    "tsh": "টিএসএইচ",
+    "t3": "টি৩",
+    "t4": "টি৪",
+    "alt_sgpt": "এএলটি (এসজিপিটি)",
+    "ast_sgot": "এএসটি (এসজিওটি)",
+    "bilirubin_total": "মোট বিলিরুবিন",
+    "uric_acid": "ইউরিক অ্যাসিড",
+    "vitamin_d": "ভিটামিন ডি",
+    "vitamin_b12": "ভিটামিন বি১২",
+    "crp": "সিআরপি",
+    "esr": "ইএসআর",
+    "lvef": "এলভিইএফ (হৃদপিণ্ডের পাম্পিং)",
+    "blood_pressure_systolic": "রক্তচাপ (সিস্টোলিক)",
+    "blood_pressure_diastolic": "রক্তচাপ (ডায়াস্টোলিক)",
+}
+
+
+def _num(value: object) -> float | None:
+    """Best-effort numeric coercion from the model's value_num / ref bound."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip().replace(",", ""))
+        except ValueError:
+            return None
+    return None
+
+
+# Synonyms → canonical metric_key. The LLM is asked to emit a canonical key,
+# but when it returns null we salvage by substring-matching the lab's "parameter"
+# text (English or Bangla). Order matters: longer/more specific patterns first.
+METRIC_KEY_SYNONYMS: list[tuple[str, str]] = [
+    # blood glucose variants — order before generic "glucose"
+    ("fasting blood sugar", "blood_glucose_fasting"),
+    ("fasting glucose", "blood_glucose_fasting"),
+    ("fbs", "blood_glucose_fasting"),
+    ("উপবাস", "blood_glucose_fasting"),
+    ("খালি পেট", "blood_glucose_fasting"),
+    ("2 hour post prandial", "blood_glucose_2hpp"),
+    ("2hr pp", "blood_glucose_2hpp"),
+    ("2hpp", "blood_glucose_2hpp"),
+    ("post prandial", "blood_glucose_2hpp"),
+    ("খাবারের পর", "blood_glucose_2hpp"),
+    ("random blood sugar", "blood_glucose_random"),
+    ("random glucose", "blood_glucose_random"),
+    ("rbs", "blood_glucose_random"),
+    # hba1c
+    ("hba1c", "hba1c"),
+    ("hb a1c", "hba1c"),
+    ("glycated hemoglobin", "hba1c"),
+    ("glycosylated hb", "hba1c"),
+    ("a1c", "hba1c"),
+    ("এইচবিএ১সি", "hba1c"),
+    # lipids
+    ("ldl cholesterol", "ldl_cholesterol"),
+    ("ldl-c", "ldl_cholesterol"),
+    ("ldl", "ldl_cholesterol"),
+    ("এলডিএল", "ldl_cholesterol"),
+    ("hdl cholesterol", "hdl_cholesterol"),
+    ("hdl-c", "hdl_cholesterol"),
+    ("hdl", "hdl_cholesterol"),
+    ("এইচডিএল", "hdl_cholesterol"),
+    ("total cholesterol", "total_cholesterol"),
+    ("cholesterol total", "total_cholesterol"),
+    ("triglyceride", "triglycerides"),
+    ("tg", "triglycerides"),
+    ("ট্রাইগ্লিসারাইড", "triglycerides"),
+    # kidney
+    ("serum creatinine", "creatinine"),
+    ("s. creatinine", "creatinine"),
+    ("creatinine", "creatinine"),
+    ("ক্রিয়েটিনিন", "creatinine"),
+    ("egfr", "egfr"),
+    ("e.gfr", "egfr"),
+    ("gfr", "egfr"),
+    ("blood urea", "urea"),
+    ("urea nitrogen", "urea"),
+    ("bun", "urea"),
+    ("urea", "urea"),
+    # CBC
+    ("hemoglobin", "hemoglobin"),
+    ("haemoglobin", "hemoglobin"),
+    ("hb", "hemoglobin"),
+    ("হিমোগ্লোবিন", "hemoglobin"),
+    ("white blood cell", "wbc"),
+    ("total wbc", "wbc"),
+    ("wbc count", "wbc"),
+    ("wbc", "wbc"),
+    ("শ্বেত রক্তকণিকা", "wbc"),
+    ("platelet count", "platelet"),
+    ("platelets", "platelet"),
+    ("platelet", "platelet"),
+    ("plt", "platelet"),
+    ("অণুচক্রিকা", "platelet"),
+    # thyroid
+    ("tsh", "tsh"),
+    ("free t3", "t3"),
+    ("ft3", "t3"),
+    (" t3", "t3"),  # leading space avoids matching inside "ft3"
+    ("free t4", "t4"),
+    ("ft4", "t4"),
+    (" t4", "t4"),
+    # liver
+    ("sgpt", "alt_sgpt"),
+    ("alt ", "alt_sgpt"),
+    ("alanine", "alt_sgpt"),
+    ("sgot", "ast_sgot"),
+    ("ast ", "ast_sgot"),
+    ("aspartate", "ast_sgot"),
+    ("total bilirubin", "bilirubin_total"),
+    ("bilirubin", "bilirubin_total"),
+    # others
+    ("uric acid", "uric_acid"),
+    ("25-oh", "vitamin_d"),
+    ("vitamin d", "vitamin_d"),
+    ("vit d", "vitamin_d"),
+    ("vitamin b12", "vitamin_b12"),
+    ("vit b12", "vitamin_b12"),
+    ("b12", "vitamin_b12"),
+    ("c-reactive protein", "crp"),
+    ("crp", "crp"),
+    ("esr", "esr"),
+    ("ejection fraction", "lvef"),
+    ("lvef", "lvef"),
+    ("ef ", "lvef"),
+    ("systolic", "blood_pressure_systolic"),
+    ("diastolic", "blood_pressure_diastolic"),
+    # generic glucose last — only match if no specific glucose variant did
+    ("glucose", "blood_glucose_random"),
+    ("blood sugar", "blood_glucose_random"),
+    ("রক্তে শর্করা", "blood_glucose_random"),
+]
+
+_VALID_METRIC_KEYS = set(METRIC_LABEL_BN.keys())
+
+
+def _normalize_metric_key(ai_key: object, parameter: object) -> str | None:
+    """Pick a canonical metric_key. Trust the model's choice if valid; otherwise
+    salvage by substring-matching the lab's printed parameter text."""
+    if isinstance(ai_key, str) and ai_key.strip() in _VALID_METRIC_KEYS:
+        return ai_key.strip()
+    if not isinstance(parameter, str):
+        return None
+    haystack = parameter.lower().strip()
+    if not haystack:
+        return None
+    for needle, canonical in METRIC_KEY_SYNONYMS:
+        if needle in haystack:
+            return canonical
+    return None
+
+
+def _extract_metrics(
+    db: Session,
+    *,
+    patient_id: uuid.UUID,
+    analysis_id: uuid.UUID,
+    document_id: uuid.UUID,
+    structured: dict,
+    measured_at: date | None,
+) -> int:
+    """Fan structured lab values with a canonical metric_key into health_metrics rows.
+    Salvages model-emitted null keys via _normalize_metric_key()."""
+    values = structured.get("values")
+    if not isinstance(values, list):
+        return 0
+    count = 0
+    for v in values:
+        if not isinstance(v, dict):
+            continue
+        key = _normalize_metric_key(v.get("metric_key"), v.get("parameter"))
+        if key is None:
+            continue
+        value_num = _num(v.get("value_num"))
+        if value_num is None:
+            value_num = _num(v.get("value"))
+        if value_num is None:
+            continue
+        db.add(
+            HealthMetric(
+                patient_id=patient_id,
+                analysis_id=analysis_id,
+                document_id=document_id,
+                metric_key=key[:64],
+                label_bn=METRIC_LABEL_BN.get(key),
+                value_num=value_num,
+                value_text=str(v.get("value"))[:128] if v.get("value") is not None else None,
+                unit=(str(v.get("unit"))[:32] if v.get("unit") else None),
+                ref_low=_num(v.get("ref_low")),
+                ref_high=_num(v.get("ref_high")),
+                abnormal=bool(v.get("abnormal")),
+                measured_at=measured_at,
+            )
+        )
+        count += 1
+    return count
 
 
 class AnalyzeIn(BaseModel):
@@ -36,6 +251,8 @@ class AnalysisOut(BaseModel):
     id: str
     document_id: str
     kind: str
+    report_type: str | None = None
+    report_date: date | None = None
     structured: dict
     explanation_bn: str
     red_flags: list[dict]
@@ -57,6 +274,8 @@ class AnalysisOut(BaseModel):
             id=str(a.id),
             document_id=str(a.document_id),
             kind=doc_kind,
+            report_type=a.report_type,
+            report_date=a.report_date,
             structured=a.structured,
             explanation_bn=a.explanation_bn,
             red_flags=a.red_flags,
@@ -140,11 +359,21 @@ def analyze(
             "ai output violated safety policy; please request human verification",
         ) from e
 
+    report_date_raw = result.get("report_date")
+    report_date_val: date | None = None
+    if isinstance(report_date_raw, str):
+        try:
+            report_date_val = date.fromisoformat(report_date_raw)
+        except ValueError:
+            report_date_val = None
+
     analysis = Analysis(
         document_id=doc.id,
         patient_id=user.id,
         model_name=result["model_name"],
         model_version=result["model_version"],
+        report_type=result.get("report_type"),
+        report_date=report_date_val,
         structured=result["structured"],
         explanation_bn=result["explanation_bn"],
         red_flags=result["red_flags"],
@@ -156,6 +385,14 @@ def analyze(
     )
     db.add(analysis)
     db.flush()
+    metric_count = _extract_metrics(
+        db,
+        patient_id=user.id,
+        analysis_id=analysis.id,
+        document_id=doc.id,
+        structured=result["structured"],
+        measured_at=report_date_val or doc.uploaded_at.date(),
+    )
     event_name = "ai.analyze.history_aware" if history else "ai.analyze.document"
     audit.record(
         db,
@@ -174,6 +411,8 @@ def analyze(
             "latency_ms": result["latency_ms"],
             "history_count": len(history),
             "kind": doc.kind,
+            "report_type": result.get("report_type"),
+            "metric_count": metric_count,
             "has_user_prompt": bool(body.user_prompt and body.user_prompt.strip()),
             "prompt_version": result.get("_prompt_version"),  # type: ignore[typeddict-item]
         },

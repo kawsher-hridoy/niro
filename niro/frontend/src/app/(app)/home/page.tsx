@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  Activity,
   ArrowRight,
   BadgeCheck,
   FileText,
@@ -14,7 +16,8 @@ import {
 } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
 import { useAppDashboard } from "@/components/app-shell/AppShellGate";
-import type { DashboardOut, DocumentOut } from "@/lib/api";
+import type { DashboardOut, DocumentOut, MetricSummary } from "@/lib/api";
+import { getMetrics } from "@/lib/api";
 import { timeAgoBn, toBangla } from "@/lib/i18n";
 
 export default function PatientHome() {
@@ -74,6 +77,8 @@ export default function PatientHome() {
         <RecentDocuments dashboard={dashboard} />
         <RecentInsights dashboard={dashboard} />
       </section>
+
+      <HealthMetricsWidget />
 
       <RecentAccess dashboard={dashboard} />
     </div>
@@ -220,6 +225,71 @@ function RecentInsights({ dashboard }: { dashboard: DashboardOut }) {
         </div>
       )}
     </div>
+  );
+}
+
+function HealthMetricsWidget() {
+  const [metrics, setMetrics] = useState<MetricSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getMetrics()
+      .then((data) => setMetrics(data.slice(0, 6)))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return null;
+  }
+
+  if (metrics.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-xl border border-[var(--color-card-border)] bg-[var(--color-card)] p-6">
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-2">
+          <Activity className="w-5 h-5 text-[var(--color-primary)]" />
+          <h2 className="text-lg font-semibold text-[var(--color-foreground)]">স্বাস্থ্য ট্রেন্ড</h2>
+        </div>
+        <Link
+          href="/trends"
+          className="text-sm font-medium text-[var(--color-primary)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 rounded-sm"
+        >
+          সব দেখুন →
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {metrics.map((m) => (
+          <Link
+            key={m.metric_key}
+            href={`/trends/${m.metric_key}`}
+            className="block rounded-lg border border-[var(--color-card-border)] p-4 hover:border-[var(--color-primary)] transition-colors"
+          >
+            <div className="flex items-start justify-between mb-2">
+              <p className="text-sm font-medium text-[var(--color-foreground)]">{m.label_bn}</p>
+              {m.abnormal && (
+                <span className="text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">!</span>
+              )}
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-bold text-[var(--color-primary)]">
+                {toBangla(m.latest_value)}
+              </span>
+              {m.unit && (
+                <span className="text-xs text-[var(--color-muted)]">{m.unit}</span>
+              )}
+            </div>
+            <p className="text-xs text-[var(--color-muted)] mt-1">
+              {toBangla(m.count)} টি রেকর্ড
+            </p>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

@@ -181,6 +181,8 @@ class Analysis(Base):
     )
     model_name: Mapped[str] = mapped_column(String(64), nullable=False)
     model_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    report_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    report_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     structured: Mapped[dict] = mapped_column(JSONB, nullable=False)  # ★
     explanation_bn: Mapped[str] = mapped_column(Text, nullable=False)  # ★
     red_flags: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")  # ★
@@ -195,6 +197,43 @@ class Analysis(Base):
 
     __table_args__ = (
         Index("ix_analyses_patient_created", "patient_id", "created_at"),
+        Index(
+            "ix_analyses_patient_reporttype_date",
+            "patient_id",
+            "report_type",
+            "report_date",
+        ),
+    )
+
+
+class HealthMetric(Base):
+    __tablename__ = "health_metrics"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("analyses.id", ondelete="CASCADE"), nullable=False
+    )
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=True
+    )
+    metric_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    label_bn: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    value_num: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)  # ★
+    value_text: Mapped[str | None] = mapped_column(String(128), nullable=True)  # ★
+    unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    ref_low: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
+    ref_high: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
+    abnormal: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    measured_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_health_metrics_patient_key_date", "patient_id", "metric_key", "measured_at"),
     )
 
 

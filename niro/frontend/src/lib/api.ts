@@ -288,6 +288,8 @@ export type AnalysisOut = {
   id: string;
   document_id: string;
   kind: string;
+  report_type: string | null;
+  report_date: string | null;
   structured: {
     patient?: string | { name?: string; age?: number | string; sex?: string };
     diagnosis?: string | string[];
@@ -306,6 +308,107 @@ export type AnalysisOut = {
   created_at: string;
   recommend_human_review: boolean;
 };
+
+// ---------- health records (grouped by report type) ----------
+
+export type RecordItem = {
+  analysis_id: string;
+  document_id: string;
+  report_date: string | null;
+  uploaded_at: string;
+  confidence: number;
+  summary_bn: string;
+  original_name: string | null;
+  mime_type: string;
+};
+
+export type RecordGroup = {
+  report_type: string | null;
+  label_bn: string;
+  count: number;
+  latest_date: string;
+  items: RecordItem[];
+};
+
+export function getRecords(): Promise<RecordGroup[]> {
+  return apiGet<RecordGroup[]>("/me/records");
+}
+
+// ---------- health metrics (trends) ----------
+
+export type MetricSummary = {
+  metric_key: string;
+  label_bn: string;
+  latest_value: number;
+  unit: string | null;
+  latest_date: string | null;
+  count: number;
+  abnormal: boolean;
+};
+
+export type MetricPoint = {
+  value_num: number;
+  unit: string | null;
+  ref_low: number | null;
+  ref_high: number | null;
+  abnormal: boolean;
+  measured_at: string | null;
+  analysis_id: string;
+  document_id: string | null;
+};
+
+export type MetricInsight = {
+  first_value: number;
+  last_value: number;
+  delta: number;
+  delta_pct: number | null;
+  slope_per_30d: number | null;
+  span_days: number;
+  direction: "improving" | "worsening" | "stable" | "increasing" | "decreasing";
+  verdict_bn: string;
+};
+
+export type MetricHistory = {
+  metric_key: string;
+  label_bn: string;
+  unit: string | null;
+  ref_low: number | null;
+  ref_high: number | null;
+  points: MetricPoint[];
+  insight: MetricInsight | null;
+};
+
+export function getMetrics(): Promise<MetricSummary[]> {
+  return apiGet<MetricSummary[]>("/me/metrics");
+}
+
+export function getMetricHistory(metricKey: string): Promise<MetricHistory> {
+  return apiGet<MetricHistory>(`/me/metrics/${encodeURIComponent(metricKey)}`);
+}
+
+/**
+ * Download the original uploaded file. A plain <a href> can't carry the
+ * Bearer token, so we fetch with auth, turn the body into a blob, and
+ * trigger a client-side download.
+ */
+export async function downloadDocument(
+  documentId: string,
+  fallbackName?: string
+): Promise<void> {
+  const r = await _send(`/documents/${documentId}/download`, { method: "GET" });
+  const blob = await r.blob();
+  const disposition = r.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const name = match?.[1] || fallbackName || documentId;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 export type TimelineEntry = {
   entry_type: "document" | "analysis" | "review";

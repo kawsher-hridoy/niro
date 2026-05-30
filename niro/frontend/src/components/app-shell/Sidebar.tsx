@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  Activity,
   BadgeCheck,
   Clock,
+  FileStack,
   FileText,
   Inbox,
   LayoutDashboard,
@@ -52,6 +54,18 @@ const patientItems: NavItem[] = [
     label: "AI বিশ্লেষণ",
     href: "/timeline?type=analysis",
     isActive: (pathname, search) => (pathname === "/timeline" && search.get("type") === "analysis") || pathname.startsWith("/analyses/"),
+  },
+  {
+    icon: FileStack,
+    label: "স্বাস্থ্য রেকর্ড",
+    href: "/records",
+    isActive: (pathname) => pathname.startsWith("/records"),
+  },
+  {
+    icon: Activity,
+    label: "স্বাস্থ্য ট্রেন্ড",
+    href: "/trends",
+    isActive: (pathname) => pathname.startsWith("/trends"),
   },
   {
     icon: Stethoscope,

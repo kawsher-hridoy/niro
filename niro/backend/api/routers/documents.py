@@ -4,15 +4,15 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from backend.db.models import Document, User
 from backend.db.session import get_db
-from backend.services import audit, storage
-from backend.services.auth import require_patient
+from backend.services import audit, consent, storage
+from backend.services.auth import current_user, require_patient
 
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -124,6 +124,53 @@ def get_document(
     )
     db.commit()
     return DocumentOut.from_orm(doc)
+
+
+@router.get("/{document_id}/download")
+def download_document(
+    document_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> Response:
+    """Stream the original uploaded file back to its owner, or to a
+    consent-verified doctor (so they can check the AI against the hardcopy)."""
+    doc = db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found")
+
+    if user.role == "patient" and doc.patient_id == user.id:
+        data = storage.read_blob(doc.storage_key)
+        audit.record(
+            db,
+            "document.download",
+            actor_id=user.id,
+            actor_role="patient",
+            patient_id=user.id,
+            document_id=doc.id,
+            detail={"mime": doc.mime_type, "size_bytes": doc.size_bytes},
+        )
+        db.commit()
+    elif user.role == "doctor":
+        try:
+            granted = consent.require(db, patient_id=doc.patient_id, doctor_id=user.id)
+        except consent.PermissionDenied as e:
+            db.commit()  # persist the consent.check_denied audit row
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found") from e
+        data = storage.read_blob(doc.storage_key)
+        consent.record_access(
+            db, consent=granted, screen="document_download", document_id=doc.id
+        )
+        db.commit()
+    else:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found")
+
+    filename = doc.original_name or str(doc.id)
+    safe_name = filename.replace('"', "").replace("\n", "").replace("\r", "")
+    return Response(
+        content=data,
+        media_type=doc.mime_type,
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+    )
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
