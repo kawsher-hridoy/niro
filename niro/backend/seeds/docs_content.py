@@ -368,7 +368,7 @@ We're not building a telemedicine app. We're building the **operating system for
 
 
 def seed_team_members():
-    """Populate initial team members (placeholder)."""
+    """Populate initial team members."""
     db = SessionLocal()
 
     try:
@@ -378,14 +378,54 @@ def seed_team_members():
             print("Team members already seeded. Skipping.")
             return
 
-        # Placeholder team member (update with real info)
+        # Real team members
         members = [
             DocsTeamMember(
-                full_name="Kawsher Hridoy",
-                role="Founder & Lead Developer",
-                email="kawsher.hridoy@example.com",
+                full_name="Md Kawsher Ahmed",
+                role="Team Leader / Project Coordinator / Backend Engineer",
+                email="kawsher@hridoy.xyz",
                 photo_url=None,
                 order=1,
+                is_published=True
+            ),
+            DocsTeamMember(
+                full_name="Sadia 627",
+                role="Business Analyst / Data Scientist",
+                email="sadia627@example.com",
+                photo_url=None,
+                order=2,
+                is_published=True
+            ),
+            DocsTeamMember(
+                full_name="Shafiur Rahman",
+                role="UI/UX / Frontend Developer",
+                email="shafiur.rahman@example.com",
+                photo_url=None,
+                order=3,
+                is_published=True
+            ),
+            DocsTeamMember(
+                full_name="Abdullah Al Khalil",
+                role="Presentation / Communication Lead",
+                email="abdullah.khalil@example.com",
+                photo_url=None,
+                order=4,
+                is_published=True
+            ),
+            DocsTeamMember(
+                full_name="Abu Fahad Biddut",
+                role="Presentation / Communication Lead",
+                email="abu.biddut@example.com",
+                photo_url=None,
+                order=5,
+                is_published=True
+            ),
+            DocsTeamMember(
+                full_name="Niloy Das",
+                role="Business Analyst / Data Scientist",
+                email="niloy.das@example.com",
+                photo_url=None,
+                order=6,
                 is_published=True
             ),
         ]
