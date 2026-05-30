@@ -502,3 +502,61 @@ class ChamberSession(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     chamber_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+# ---------- Docs Module (D-017) ----------
+
+
+class DocsConfig(Base):
+    """Singleton config for /docs visibility and scheduling."""
+
+    __tablename__ = "docs_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    start_datetime: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    end_datetime: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+
+
+class DocsSection(Base):
+    """Editable documentation sections."""
+
+    __tablename__ = "docs_sections"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    section_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_docs_sections_order", "order"),)
+
+
+class DocsTeamMember(Base):
+    """Team members for the Team section."""
+
+    __tablename__ = "docs_team_members"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    full_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    role: Mapped[str] = mapped_column(String(128), nullable=False)
+    email: Mapped[str] = mapped_column(String(254), nullable=False)
+    photo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    __table_args__ = (Index("ix_docs_team_members_order", "order"),)
