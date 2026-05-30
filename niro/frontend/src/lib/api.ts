@@ -138,10 +138,11 @@ async function _send(
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     let body: unknown;
+    const text = await res.text();
     try {
-      body = await res.json();
+      body = JSON.parse(text);
     } catch {
-      body = await res.text();
+      body = text;
     }
     throw new ApiError(res.status, body);
   }

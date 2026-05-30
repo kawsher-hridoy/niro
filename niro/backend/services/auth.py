@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal
 
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError, InvalidHashError
+from argon2.exceptions import VerifyMismatchError, InvalidHashError, VerificationError
 from fastapi import Depends, Header, HTTPException, status
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -40,7 +40,7 @@ def hash_password(plain: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     try:
         return _ph.verify(hashed, plain)
-    except (VerifyMismatchError, InvalidHashError):
+    except (VerifyMismatchError, InvalidHashError, VerificationError):
         return False
 
 
