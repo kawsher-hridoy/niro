@@ -29,12 +29,58 @@ export type AuthErrorBody = {
   fields?: Record<string, string>;
 };
 
+const FIELD_LABEL_BN: Record<string, string> = {
+  full_name: "পূর্ণ নাম",
+  email: "ইমেইল",
+  phone: "ফোন নম্বর",
+  password: "পাসওয়ার্ড",
+  confirm_password: "পাসওয়ার্ড নিশ্চিতকরণ",
+  new_password: "নতুন পাসওয়ার্ড",
+  code: "OTP কোড",
+  bmdc_number: "BMDC নম্বর",
+};
+
+// Map one FastAPI validation-error item to a Bangla, field-aware message.
+function validationMessageBn(field: string, type: string, fallback: string): string {
+  if (type.includes("too_short") || type.includes("min_length")) {
+    if (field.includes("password")) return "কমপক্ষে ৮ অক্ষর হতে হবে";
+    return `${FIELD_LABEL_BN[field] ?? field} আরও দীর্ঘ হতে হবে`;
+  }
+  if (field === "phone") return "সঠিক মোবাইল নম্বর দিন (১১ সংখ্যা, যেমন 01XXXXXXXXX)";
+  if (field === "email") return "সঠিক ইমেইল ঠিকানা দিন";
+  return fallback || "এই তথ্যটি সঠিক নয়";
+}
+
 export function parseAuthError(e: unknown): AuthErrorBody {
   if (e instanceof ApiError) {
     const b = e.body;
     if (b && typeof b === "object") {
       const obj = b as { detail?: unknown; fields?: unknown };
-      // FastAPI sometimes wraps non-string detail as the whole error body
+      // FastAPI's DEFAULT 422 returns detail as an array of {loc, msg, type} —
+      // map it to per-field Bangla errors instead of falling back to "HTTP 422".
+      if (Array.isArray(obj.detail)) {
+        const fields: Record<string, string> = {};
+        for (const item of obj.detail as Array<{
+          loc?: unknown;
+          msg?: unknown;
+          type?: unknown;
+        }>) {
+          const loc = Array.isArray(item.loc) ? item.loc : [];
+          const key = String(loc[loc.length - 1] ?? "");
+          if (key && key !== "body") {
+            fields[key] = validationMessageBn(
+              key,
+              String(item.type ?? ""),
+              String(item.msg ?? "")
+            );
+          }
+        }
+        return {
+          detail: "validation failed",
+          fields: Object.keys(fields).length ? fields : undefined,
+        };
+      }
+      // Niro's custom errors: {detail} string, or nested {detail:{detail,fields}}.
       const inner =
         obj.detail && typeof obj.detail === "object"
           ? (obj.detail as { detail?: unknown; fields?: unknown })
@@ -199,7 +245,12 @@ export type ResetStartOut = {
   expires_at: string;
   otp?: string | null;
 };
-export type ResetConfirmIn = { phone: string; code: string; new_password: string };
+export type ResetConfirmIn = {
+  reset_token: string;
+  phone: string;
+  code: string;
+  new_password: string;
+};
 export type OtpRequestOut = { ok: boolean; dev_hint?: string | null };
 export type DoctorApplyIn = SignupStartIn & {
   bmdc_number: string;

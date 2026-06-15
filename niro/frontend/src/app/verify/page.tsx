@@ -9,7 +9,8 @@ function VerifyForm() {
   const router = useRouter();
   const phone = params.get("phone") ?? "";
   const signupToken = params.get("signup_token");
-  const resetToken = params.get("reset_token");
+  const resetTokenParam = params.get("reset_token") ?? "";
+  const [resetToken, setResetToken] = useState(resetTokenParam);
   const mode: "signup" | "reset" | "legacy" = signupToken
     ? "signup"
     : resetToken
@@ -27,6 +28,7 @@ function VerifyForm() {
 
   useEffect(() => {
     if (mode === "legacy" && !phone) router.replace("/signin");
+    if (mode === "reset" && !phone) router.replace("/forgot-password");
   }, [mode, phone, router]);
 
   useEffect(() => {
@@ -49,6 +51,7 @@ function VerifyForm() {
         router.replace(session.role === "doctor" ? "/doctor-portal/dashboard" : "/home");
       } else if (mode === "reset") {
         const session = await authApi.resetConfirm({
+          reset_token: resetToken,
           phone,
           code,
           new_password: newPassword,
@@ -75,7 +78,14 @@ function VerifyForm() {
       if (mode === "signup" && signupToken) {
         await authApi.signupResendOtp(signupToken);
       } else if (mode === "reset") {
-        await authApi.resetStart(phone);
+        const out = await authApi.resetStart(phone);
+        setResetToken(out.reset_token);
+        router.replace(
+          "/verify?reset_token=" +
+            encodeURIComponent(out.reset_token) +
+            "&phone=" +
+            encodeURIComponent(phone)
+        );
       } else {
         await authApi.loginOtpRequest(phone);
       }

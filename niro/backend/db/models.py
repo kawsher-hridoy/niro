@@ -68,6 +68,7 @@ class OtpCode(Base):
     purpose: Mapped[str] = mapped_column(String(16), nullable=False, default="login")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    reset_token: Mapped[str | None] = mapped_column(String(64), nullable=True)  # For password reset validation
 
     __table_args__ = (
         CheckConstraint("purpose IN ('login','reset')", name="ck_otp_codes_purpose"),

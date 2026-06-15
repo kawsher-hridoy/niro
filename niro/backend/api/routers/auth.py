@@ -53,7 +53,8 @@ MAX_OTP_ATTEMPTS = 5
 MAX_RESEND = 3
 
 _EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
-_PHONE_RE = re.compile(r"^\+?[1-9]\d{7,14}$")
+# Bangladesh phone: +8801XXXXXXXXX (10 digits after +880, starting with 1-9)
+_PHONE_RE = re.compile(r"^\+880[1-9]\d{9}$|^880[1-9]\d{9}$")
 
 
 # ---------- helpers ----------
@@ -135,8 +136,9 @@ class SignupStartIn(BaseModel):
     full_name: Annotated[str, StringConstraints(min_length=2, max_length=80, strip_whitespace=True)]
     email: Annotated[str, StringConstraints(min_length=3, max_length=254)]
     phone: Annotated[str, StringConstraints(min_length=8, max_length=20)]
-    password: Annotated[str, StringConstraints(min_length=8, max_length=128)]
-    confirm_password: Annotated[str, StringConstraints(min_length=8, max_length=128)]
+    # Strength (≥8, letter+digit, match) enforced by _validate_password_strength → friendly Bangla {detail,fields} 422, not Pydantic's opaque array.
+    password: Annotated[str, StringConstraints(min_length=1, max_length=128)]
+    confirm_password: Annotated[str, StringConstraints(min_length=1, max_length=128)]
 
     @field_validator("email")
     @classmethod
@@ -644,6 +646,7 @@ class ResetStartOut(BaseModel):
 
 
 class ResetConfirmIn(BaseModel):
+    reset_token: str
     phone: Annotated[str, StringConstraints(min_length=8, max_length=20)]
     code: Annotated[str, StringConstraints(min_length=4, max_length=8)]
     new_password: Annotated[str, StringConstraints(min_length=8, max_length=128)]
@@ -662,7 +665,28 @@ def password_reset_start(body: ResetStartIn, db: Session = Depends(get_db)) -> R
     reset_token = secrets.token_hex(16)
     otp_code: str | None = None
     if user is not None:
-        otp_code = _issue_otp(db, body.phone, purpose="reset")
+        code = MOCK_OTP_CODE if _is_dev() else f"{secrets.randbelow(1_000_000):06d}"
+        stored = _store_otp(code)
+
+        # Store OTP with reset_token for validation
+        existing = db.get(OtpCode, body.phone)
+        if existing:
+            existing.code_hash = stored
+            existing.purpose = "reset"
+            existing.expires_at = expires_at
+            existing.attempts = 0
+            existing.reset_token = reset_token
+        else:
+            db.add(
+                OtpCode(
+                    phone=body.phone,
+                    code_hash=stored,
+                    purpose="reset",
+                    expires_at=expires_at,
+                    reset_token=reset_token,
+                )
+            )
+        otp_code = code
         audit.record(
             db,
             "auth.password.reset.started",
@@ -697,6 +721,13 @@ def password_reset_confirm(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "OTP expired")
     if row.attempts >= MAX_OTP_ATTEMPTS:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many attempts")
+
+    # Validate reset_token
+    if not row.reset_token or row.reset_token != body.reset_token:
+        row.attempts += 1
+        db.commit()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid reset token")
+
     if not _verify_otp(body.code, row.code_hash):
         row.attempts += 1
         db.commit()
