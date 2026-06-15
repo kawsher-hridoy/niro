@@ -378,6 +378,16 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 - **Verified by:** Documentation consistency greps for stale counts/routes and manual diff review.
 - **Branch:** `fix/update-docs-agent-skill`.
 
+
+### Ops note — Live /docs database migration
+
+- **Date:** 2026-05-31
+- **Problem:** `https://nirobd.tech/docs` loaded the Next.js page shell, but the client fetch to `GET /api/v1/docs/config` returned HTTP 500.
+- **Root cause:** Production code included the D-017 docs module, but the production database was still at Alembic revision `c5f4e8d20a17`; the required `docs_config`, `docs_sections`, and `docs_team_members` tables from `a9b5d9e308af` did not exist.
+- **Change:** Applied only the docs migration `a9b5d9e308af` (leaving the unrelated reset-token head unapplied), then seeded docs sections/team content with `backend/seeds/docs_content.py`.
+- **Verified by:** `GET /api/v1/docs/config` now returns 200 with the configured private June 10-14 window; `/docs` returns 200. Visibility was not changed because D-017 intentionally keeps docs private until admin/public-window approval.
+- **Follow-up:** User requested public access; set `docs_config.is_public=true` and cleared `start_datetime`/`end_datetime`. Verified `GET /api/v1/docs/config` returns `is_available=true`, and `/docs`, `/api/v1/docs/sections`, and `/api/v1/docs/live-stats` return 200.
+
 ---
 
 ## Template for new entries

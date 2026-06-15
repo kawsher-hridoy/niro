@@ -25,24 +25,46 @@ Generic-agent guidance: `AGENTS.md` (this complements that file).
 | B — AI + upload                  | 23 May          | ✅ **Merged** (PR #2)                |
 | C — Profile + verification       | 23 May          | ✅ **Merged** (PR #3)                |
 | D — Chamber + directory + polish | 23 May          | ✅ **Merged** (PR #4)                |
-| **E — Video submission**         | 27 May          | ⏳ **User action** — record + submit |
-| F — Live-demo polish             | 28 May – 14 Jun | Conditional on 30 May shortlist      |
-| G — Demo day                     | 15 Jun          | Conditional                          |
+| E — Video + submission           | 27 May          | ✅ Recorded + submitted              |
+| **F — Live-demo polish**         | 28 May – 15 Jun | 🔧 **Active** — submission prep on live site |
+| G — Demo day                     | 15 Jun          | Imminent (today)                     |
 
-**Phase 1 build is feature-complete on `main`.** When picking up a new
-session: read `docs/build-log.md` Day 4 entry first, then Day 5 (issue
-fixes loop, currently active — see "Issue-fix workflow" section below).
-Day-5 fixes already shipped the public landing rebuild, SaaS auth, the
-authenticated patient shell/dashboard, the doctor onboarding +
-verified-doctor dashboard, and PDF vision support (Fix #8 — PyMuPDF
-rasterization at 200 DPI, 5-page cap). Three post-Phase-1 **features**
-(not fixes) have merged: document chat + prompt-with-upload (D-014,
-PR #8 — `conversations`/`chat_messages` tables, `/api/v1/conversations`
-router, `chat_about_analysis` provider method, chat panel on the
-analysis page); and the longitudinal medical-profile layer (D-015 +
-D-016, commit `5f853a4` — report-type records, original-file download,
-trendable `health_metrics`, `/records` + `/trends` pages, doctor
-case-view metrics + consent-gated hardcopy download).
+**Active work: submission prep + issue-fix loop on the live
+nirobd.tech site.** Phase 1 is feature-complete and deployed; current
+sessions are branch-per-issue fixes and demo polish (see "Issue-fix
+workflow" below). When picking up a new session, read the tail of
+`docs/build-log.md` first — the Day-5 loop runs long and the newest
+entries are the live state.
+
+**What's shipped since the Phase-1 squash-merges (all on `main`):**
+
+- **Day-5 fixes** — landing rebuild (Fix #1), SaaS auth (Fix #2), patient
+  app-shell + dashboard (Fix #3), doctor onboarding + verified-doctor
+  dashboard (Fix #4), PDF vision via PyMuPDF (Fix #8, 200 DPI / 5-page
+  cap), upload file-picker styling (Fix #12), welcome greeting (Fix #11),
+  and the **auth-hardening fixes #14/#15** (Bangladesh `+880` phone
+  normalization, `VerificationError` + body-stream-read fixes).
+- **Feature merges** — document chat + prompt-with-upload (D-014, PR #8);
+  longitudinal medical-profile layer (D-015 + D-016, commit `5f853a4` —
+  report-type records, original-file download, trendable `health_metrics`,
+  `/records` + `/trends` pages, doctor case-view metrics + consent-gated
+  hardcopy download); and the **live `/docs` module (D-017, commit
+  `751be92`)** — YC-style pitch deck + technical docs + live system stats,
+  with an **`admin` role** and admin-controlled visibility. Live + public
+  on nirobd.tech.
+
+**⚠️ In-progress (uncommitted/staged) right now:** a password-reset
+hardening fix — a `reset_token` column on `otp_codes` (migration
+`e8f3a1b4c9d2`, staged), `reset_token` validation in
+`auth.password_reset_confirm`, and the matching `/verify` + `api.ts`
+frontend changes. Don't assume it's merged; confirm git state before
+building on it.
+
+**Prod-vs-local migration skew (read before migrating):** prod is
+intentionally one revision behind the local file chain — it's at
+`a9b5d9e308af` (docs module), and the `e8f3a1b4c9d2` reset-token head is
+*not* applied on prod yet (see the build-log "Ops note — Live /docs
+database migration"). Local `alembic upgrade head` → `e8f3a1b4c9d2`.
 
 ---
 
@@ -54,9 +76,9 @@ case-view metrics + consent-gated hardcopy download).
 | Dep manager | `uv` 0.11.x                                                                                      | 10-100× faster than pip; venv at `niro/.venv`                                                                                  |
 | Backend     | FastAPI 0.115, SQLAlchemy 2.0.49, Alembic 1.14, psycopg 3 (binary), pydantic-settings, structlog | Sync routes by design — see D-008                                                                                              |
 | AI provider | Azure OpenAI `gpt-chat-latest` (Preview, retires 5 Aug 2026)                                     | Endpoint `https://ai-for-security.services.ai.azure.com/openai/v1`. **Use `Authorization: Bearer ...` header, not `api-key:`** |
-| DB          | `postgres:16.3-alpine3.20` (cached locally — see D-007)                                          | pgvector deferred; Phase 1 has no vector queries                                                                               |
+| DB          | `postgres:16.3-alpine3.20` (cached locally — see D-007)                                          | pgvector deferred; Phase 1 has no vector queries. Local migration head `e8f3a1b4c9d2`; prod at `a9b5d9e308af` (see Status) |
 | Frontend    | **Next.js 16.2.6** (App Router, Turbopack default), React 19.2, Tailwind 4                       | See "Next.js 16 gotchas" below                                                                                                 |
-| Auth        | Patient signup/password login/reset + legacy OTP, doctor application + OTP for seeded doctors, JWT HS256 | Passwords use Argon2id (D-012); OTP storage uses sha256(salt:code) (D-009). Dev doctor applications auto-verify when `APP_ENV != "prod"` |
+| Auth        | Patient signup/password login/reset + legacy OTP, doctor application + OTP for seeded doctors, JWT HS256. Three roles: `patient`, `doctor`, `admin` | Passwords use Argon2id (D-012); OTP storage uses sha256(salt:code) (D-009). Dev doctor applications auto-verify when `APP_ENV != "prod"`. `admin` role gates `/docs` admin endpoints (D-017) via `require_admin` |
 | Hosting     | **LIVE: https://nirobd.tech** — Azure VM, single-domain (Caddy path-routes `/api/*`→:8000, else→:3000), systemd | Deploy updates with `./deploy.sh` on the VM. Single-origin ⇒ **no CORS**; relative API base. See `docs/deployment/`. |
 
 ---
@@ -159,7 +181,7 @@ single switch point.
 ├── .env.example                  # committed template
 ├── .env                          # gitignored, holds Azure key
 ├── docker-compose.yml            # Postgres (alpine)
-├── docs/                         # 29+ engineering docs
+├── docs/                         # 30+ engineering docs
 ├── .claude/
 │   ├── skills/niro/SKILL.md      # Niro project skill
 │   └── settings.local.json       # gitignored
@@ -175,20 +197,20 @@ single switch point.
     │   ├── db/
     │   │   ├── base.py
     │   │   ├── session.py        # sync engine + SessionLocal + get_db
-    │   │   ├── models.py         # current SQLAlchemy models
-    │   │   └── migrations/       # revisions through c5f4e8d20a17 (phase E: health_metrics)
+    │   │   ├── models.py         # SQLAlchemy models (~20 tables incl. docs module D-017)
+    │   │   └── migrations/       # local head e8f3a1b4c9d2 (otp reset_token); D-017 docs tables at a9b5d9e308af
     │   ├── ai/
     │   │   ├── provider.py       # AIProvider ABC + factory
     │   │   ├── azure.py          # AzureOpenAIProvider concrete impl
-    │   │   ├── prompts.py        # versioned Bangla prompts (rx, lab, history, case)
+    │   │   ├── prompts.py        # versioned Bangla prompts (rx, lab, history, case, chat)
     │   │   └── policy.py         # banned-phrase linter
     │   ├── services/
     │   │   ├── audit.py          # AuditWriter (append-only)
     │   │   ├── consent.py        # ConsentGuard.require + record_access
     │   │   ├── storage.py        # local blob writer with sha256
-    │   │   └── auth.py           # JWT, password hashing, current_user, role/verified-doctor deps
-    │   ├── api/routers/
-    │   │   ├── auth.py           # signup, password login/reset, doctor apply, OTP, refresh/logout
+    │   │   └── auth.py           # JWT, password hashing, current_user, role deps (require_patient/doctor/verified_doctor/admin)
+    │   ├── api/routers/          # 11 routers, all mounted under /api/v1
+    │   │   ├── auth.py           # signup, password login/reset (reset_token WIP), doctor apply, OTP, refresh/logout
     │   │   ├── documents.py      # upload, list, get, delete, download (consent-gated for doctors — D-015)
     │   │   ├── analyses.py       # AI analyze (history-aware, user_prompt, report_type/date + metric extraction) + list + get
     │   │   ├── chat.py           # per-analysis conversation: get thread, post message (D-014)
@@ -197,17 +219,21 @@ single switch point.
     │   │   ├── verifications.py  # request, mock-pay, list, get
     │   │   ├── doctor.py         # status, dashboard, inbox, case view (consent-gated), submit review
     │   │   ├── doctors.py        # public directory + reviews
-    │   │   └── chamber.py        # session lifecycle: open, scan, profile, prescription, close
-    │   ├── seeds/doctors.py      # 6 BMDC-verified seed
-    │   └── tests/                # empty (Phase F2 fills in golden tests)
+    │   │   ├── chamber.py        # session lifecycle: open, scan, profile, prescription, close
+    │   │   └── docs.py           # live /docs module (D-017): config/sections/team/live-stats/features/tech-stack (8 public + 5 admin)
+    │   ├── seeds/
+    │   │   ├── doctors.py        # 6 BMDC-verified seed
+    │   │   └── docs_content.py   # /docs sections + team content seed (D-017)
+    │   └── tests/                # empty (golden tests still TODO)
     └── frontend/                 # Next.js 16 PWA
-        ├── package.json          # next 16, react 19, tailwind 4, qrcode.react, html5-qrcode
+        ├── package.json          # next 16, react 19, tailwind 4, lucide-react, qrcode.react, html5-qrcode
         ├── next.config.ts        # allowedDevOrigins
         ├── AGENTS.md, CLAUDE.md  # Next.js's own warnings — DON'T DELETE
         └── src/
             ├── app/
             │   ├── layout.tsx, globals.css (print stylesheet), page.tsx (marketing landing — Fix #1)
-            │   ├── signin/, signin/otp/, verify/, forgot-password/
+            │   ├── signin/, signin/otp/, verify/, forgot-password/, settings/
+            │   ├── docs/, docs/admin/                  # public /docs view + admin panel (D-017)
             │   ├── (app)/layout.tsx                    # patient authenticated shell
             │   ├── (app)/home/, upload/, timeline/, access-log/
             │   ├── (app)/records/, (app)/records/[type]/    # health records grouped by report_type (D-015)
@@ -222,7 +248,7 @@ single switch point.
             │       ├── inbox/
             │       ├── cases/[id]/
             │       └── chamber/    # QR + 2s polling state machine
-            ├── components/        # EmptyState + app-shell components
+            ├── components/        # EmptyState + AnalysisChat + app-shell components
             └── lib/
                 ├── api.ts          # typed fetch wrapper + all response types
                 └── i18n.ts         # toBangla, timeAgoBn
@@ -250,6 +276,7 @@ single switch point.
 | **D-014** | Document chat + prompt-with-upload: text-grounded (reads stored analysis, not re-sent image), blocking, one conversation per analysis | `backend/db/models.py` (`Conversation`, `ChatMessage`), migration `7c1a9f4b2e10`, `backend/ai/prompts.py` (`CHAT_PROMPT_BN`), `backend/ai/azure.py` (`chat_about_analysis`), `backend/api/routers/chat.py`, `frontend/src/components/AnalysisChat.tsx` |
 | **D-015** | Report-type-aware health records + original-file download: AI classifies fine-grained `report_type` + `report_date` onto `Analysis`; `/me/records` groups by type; `/documents/{id}/download` (patient-owner direct, doctor consent-gated) | `backend/db/models.py` (`Analysis.report_type`/`report_date`), migration `b3e2d7a91c44`, `backend/ai/azure.py` (`_clean_report_type`/`_clean_iso_date`), `backend/api/routers/{analyses,documents,profile}.py`, `frontend/src/app/(app)/records/`, `frontend/src/lib/api.ts` (`getRecords`, `downloadDocument`) |
 | **D-016** | Health-metrics trend layer: lab values extracted into `health_metrics` (canonical `metric_key` vocabulary, numeric value + ref range, forward-only); `/me/metrics`(+`/{key}`) with computed directional trend insight; `/trends` pages + inline-SVG chart; doctor case-view metrics | `backend/db/models.py` (`HealthMetric`), migration `c5f4e8d20a17`, `backend/ai/prompts.py` (lab-bn-v1.2), `backend/api/routers/{analyses,profile,doctor}.py`, `frontend/src/app/(app)/trends/`, `frontend/src/app/(app)/home/page.tsx` (`HealthMetricsWidget`), `frontend/src/lib/api.ts` (`getMetrics`, `getMetricHistory`) |
+| **D-017** | Live `/docs` module: YC-style pitch deck + technical docs + real-time system stats, admin-controlled visibility (DB-scheduled window, default private). Adds an **`admin` role** + `require_admin`. Public + live on nirobd.tech. | `backend/db/models.py` (`DocsConfig`/`DocsSection`/`DocsTeamMember`), migration `a9b5d9e308af`, `backend/api/routers/docs.py` (8 public + 5 admin endpoints), `backend/seeds/docs_content.py`, `backend/services/auth.py` (`require_admin`), `frontend/src/app/docs/` + `docs/admin/` |
 
 See `docs/decisions.md` for rationale + alternatives on each.
 
@@ -292,14 +319,24 @@ See `docs/decisions.md` for rationale + alternatives on each.
 ## Build / run / verify commands
 
 ```bash
+# Easiest path: the niro.sh control script (idempotent) — wraps everything below
+./niro.sh setup      # first-time: venv + deps + migrations + seed doctors
+./niro.sh start      # Postgres + backend (:8000) + frontend (:3000)
+./niro.sh status     # what's running + last log lines
+./niro.sh probe      # re-run the AI capability probe
+./niro.sh stop       # stop backend + frontend (Postgres stays; --with-db stops it)
+
+# --- or run each piece manually ---
+
 # Start Postgres
 docker compose up -d postgres
 
 # Backend (terminal 1)
 cd niro
 source .venv/bin/activate
-alembic -c alembic.ini upgrade head    # current head: c5f4e8d20a17
+alembic -c alembic.ini upgrade head    # local head: e8f3a1b4c9d2 (otp reset_token)
 python -m backend.seeds.doctors        # idempotent; seeds 6 doctors
+python -m backend.seeds.docs_content   # idempotent; seeds /docs sections + team (D-017)
 uvicorn backend.main:app --reload --port 8000
 
 # Frontend (terminal 2)
@@ -380,6 +417,8 @@ The full workflow plan lives at `/home/l0minex/.claude/plans/twinkly-inventing-p
 - **Don't reintroduce dark mode** for Phase 1 — the `prefers-color-scheme: dark` override was removed in Fix #1 (D-011). Light-mode only until explicitly reopened.
 - **Don't commit a fix directly to `main`** — use the issue-fix workflow above (branch per issue → squash-merge after user approval).
 - **Don't put authenticated patient/doctor pages back at top-level routes** — keep patient pages under `(app)` and verified doctor pages under `(doctor)`. Route groups preserve URLs.
+- **Don't blindly `alembic upgrade head` on prod.** Prod is intentionally one revision behind local (at `a9b5d9e308af`); the `e8f3a1b4c9d2` reset-token head ships only with the reset-token feature. On prod, apply migrations deliberately, not "to head" — see Status + the build-log Ops note.
+- **Don't flip `/docs` visibility casually.** D-017 visibility is admin-controlled via DB (`docs_config`), not code. Change it through the `PATCH /docs/config` admin endpoint / `/docs/admin` panel — don't hardcode it or edit the row by hand in a migration.
 
 ---
 
