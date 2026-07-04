@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Niro — Techathon Abstract</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #0f7b4a;
+    --green-dark: #0a5e38;
+    --ink: #1a1f1c;
+    --muted: #5c6662;
+    --border: #e7e5df;
+    --soft: #e8f4ed;
+    --soft-border: #d5e8dd;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { size: A4; margin: 0; }
+  body {
+    font-family: "Inter", "Ubuntu", "Noto Sans", "DejaVu Sans", sans-serif;
+    color: var(--ink);
+    background: #ffffff;
+  }
+  .bn { font-family: "Noto Sans Bengali", sans-serif; }
+  .page {
+    width: 210mm; height: 296.5mm;
+    padding: 12mm 16mm 10mm;
+    position: relative;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .topbar {
+    position: absolute; top: 0; left: 0; right: 0; height: 3.6mm;
+    background: linear-gradient(90deg, var(--green-dark) 0%, var(--green) 55%, #35a06f 100%);
+  }
+
+  /* ---------- header ---------- */
+  .masthead { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 3mm; }
+  .brand { display: flex; align-items: center; gap: 3.4mm; }
+  .brand-mark {
+    width: 12.5mm; height: 12.5mm; border-radius: 3.1mm;
+    background: var(--green); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Noto Sans Bengali", sans-serif;
+    font-size: 21px; font-weight: 700; line-height: 1;
+    letter-spacing: 0;
+  }
+  .brand-name { font-size: 25px; font-weight: 800; letter-spacing: -0.02em; }
+  .brand-sub { font-size: 9.2px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 1.5px; }
+  .event-tag { text-align: right; font-size: 10px; color: var(--muted); line-height: 1.55; padding-top: 1.5mm; }
+  .event-tag b { color: var(--ink); font-weight: 700; }
+
+  .title-block { margin: 6mm 0 3.5mm; }
+  h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+  h1 .dash { color: var(--green); }
+  .tagline { font-size: 15px; color: var(--green); font-weight: 600; margin-top: 2mm; }
+
+  .chips { display: flex; gap: 2.6mm; flex-wrap: wrap; margin-bottom: 4.5mm; }
+  .chip {
+    font-size: 9.6px; font-weight: 600; color: var(--ink);
+    border: 1px solid var(--border); border-radius: 99px;
+    padding: 1.5mm 3.5mm; background: #fbfbf9;
+  }
+  .chip.live { background: var(--soft); border-color: var(--soft-border); color: var(--green-dark); }
+
+  .rule { border: none; border-top: 1px solid var(--border); margin-bottom: 4.5mm; }
+
+  /* ---------- sections ---------- */
+  .section { margin-bottom: 4.3mm; }
+  .sec-label {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.005em;
+    display: flex; align-items: baseline; gap: 2.1mm; margin-bottom: 1.8mm;
+  }
+  .sec-label::before {
+    content: ""; width: 2.8mm; height: 2.8mm; border-radius: 0.8mm;
+    background: var(--green); align-self: center; flex: 0 0 auto;
+  }
+  p.body { font-size: 10.5px; line-height: 1.55; color: #2a312d; }
+  p.body i { color: var(--ink); }
+  p.body b { color: var(--ink); }
+
+  .solution-intro { font-size: 10.5px; line-height: 1.55; color: #2a312d; margin-bottom: 3.2mm; }
+
+  /* ---------- feature cards ---------- */
+  .cards { display: flex; gap: 4.5mm; margin-bottom: 1mm; }
+  .card {
+    flex: 1 1 0;
+    background: var(--soft);
+    border: 1px solid var(--soft-border);
+    border-radius: 3.2mm;
+    padding: 4mm 4.4mm 4.2mm;
+  }
+  .card-head { display: flex; align-items: center; gap: 2.8mm; margin-bottom: 2.4mm; }
+  .card-num {
+    width: 7.4mm; height: 7.4mm; border-radius: 50%;
+    background: var(--green); color: #fff;
+    font-size: 12.5px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  }
+  .card-title { font-size: 12.4px; font-weight: 800; line-height: 1.28; }
+  .card-title .bn { font-weight: 700; color: var(--green-dark); font-size: 11.6px; }
+  .card p { font-size: 10.2px; line-height: 1.54; color: #22322a; }
+
+  /* ---------- impact band ---------- */
+  .impact {
+    background: var(--soft);
+    border-left: 1.8mm solid var(--green);
+    border-radius: 1.8mm;
+    padding: 3.4mm 4.4mm;
+    margin-top: 0.6mm;
+  }
+  .impact .sec-inline { font-weight: 800; font-size: 11.4px; margin-right: 1.4mm; }
+  .impact p { display: inline; font-size: 10.5px; line-height: 1.55; color: #1d2b23; }
+
+  /* ---------- footer ---------- */
+  .footer {
+    margin-top: auto; padding-top: 3.2mm;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 9.4px; color: var(--muted);
+  }
+  .footer .bn { color: var(--green-dark); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar"></div>
+
+  <div class="masthead">
+    <div class="brand">
+      <div class="brand-mark"><span class="bn">নি</span></div>
+      <div>
+        <div class="brand-name">Niro</div>
+        <div class="brand-sub">Patient-owned health records · Bangladesh</div>
+      </div>
+    </div>
+    <div class="event-tag">
+      <b>IUT Techathon Nationals &amp; Rover Summit 2026</b><br>
+      Project Showcasing · Round 1 Abstract
+    </div>
+  </div>
+
+  <div class="title-block">
+    <h1>Niro <span class="dash">—</span> Your Health, in Your Own Hands</h1>
+    <div class="tagline bn">আপনার স্বাস্থ্য, আপন হাতে</div>
+  </div>
+
+  <div class="chips">
+    <span class="chip">Team Cortex Crew</span>
+    <span class="chip">Senior Category</span>
+    <span class="chip">AI/ML — Digital Health</span>
+    <span class="chip live">Fully working product</span>
+  </div>
+
+  <hr class="rule">
+
+  <div class="section">
+    <div class="sec-label">The problem — every household knows it</div>
+    <p class="body">In Bangladesh, a family's entire medical history lives in a polythene bag: handwritten prescriptions no one can read, lab reports from different labs in different formats. Nobody — not the patient, not the doctor — can answer the simplest question about a life: <i>"Is my blood sugar getting better or worse?"</i> Every report is read once and forgotten. Doctors repeat tests that were already paid for, slow deteriorations creep by unnoticed, and short visits are spent reconstructing history from paper.</p>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">Our solution</div>
+    <p class="solution-intro">Niro turns that bag of paper into a living, self-organizing health record — in Bangla. Two core innovations:</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-num">1</div>
+          <div class="card-title">Auto-categorized records<br><span class="bn">স্বাস্থ্য রেকর্ড</span></div>
+        </div>
+        <p>Photograph any medical paper. A multimodal vision-language model reads it, explains it in plain Bangla, classifies it — prescription, CBC, blood-sugar report, lipid profile — extracts its date, and files it on the right shelf automatically. No typing, no prompting skill: the filing cabinet builds itself.</p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-num">2</div>
+          <div class="card-title">Health Trends<br><span class="bn">স্বাস্থ্য ট্রেন্ড</span></div>
+        </div>
+        <p>Every lab value is extracted into one of 28 canonical health metrics with its reference range, then charted across months. Abnormal values are flagged, and each metric carries a directional insight — <i>"fasting glucose rising over six months."</i> Scattered one-time readings become a visible trajectory that patients act on and doctors trust. No paper file — and no chatbot — can do this.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">Around this core</div>
+    <p class="body">The AI reads each new document against the patient's full history, flagging risks like a new drug clashing with an existing one; one tap requests a BMDC-licensed doctor's verification for 200–800 taka — the AI pre-writes the case summary, so review takes five minutes, not thirty; and in offline chambers a QR scan shares the record for the visit only, with time-bound, auto-revoking consent.</p>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">Safe by design</div>
+    <p class="body">Niro never diagnoses and never prescribes; it extracts, explains, and flags. Low-confidence outputs automatically recommend human review, a banned-phrase linter blocks dosing language, every AI call and record access lands in an append-only audit log, and patients can delete all their data — aligned with Bangladesh's Data Protection Act 2023.</p>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">Uniqueness</div>
+    <p class="body">Praava, Daktarbhai, Tonic, and Arogga store files, list doctors, or sell telemedicine calls; chatbots answer one question and forget you. None turns paper into a categorized, trend-tracking, patient-owned record in Bangla. Niro does.</p>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">Feasibility and cost</div>
+    <p class="body">Fully built and working end-to-end (FastAPI, Next.js PWA, PostgreSQL) — not a concept. It runs in any phone browser, no app store needed; hosting fits free cloud tiers, and per-analysis AI cost is a few taka — near-zero operating cost.</p>
+  </div>
+
+  <div class="impact">
+    <span class="sec-inline">Impact.</span>
+    <p>For the first time, 170 million people can see their whole health story — organized, charted, and explained in their own language — and every doctor gets that story in thirty seconds. We are ready to demonstrate the complete live system at the final round.</p>
+  </div>
+
+  <div class="footer">
+    <div>Niro · <span class="bn">আপনার স্বাস্থ্য, আপন হাতে</span></div>
+    <div>Team Cortex Crew · First Round Submission · 2026</div>
+  </div>
+</div>
+</body>
+</html>
