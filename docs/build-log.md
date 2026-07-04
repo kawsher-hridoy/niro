@@ -390,6 +390,23 @@ Post-Phase-D iteration: user-driven fix loop. Each entry below is one approved i
 
 ---
 
+## Day 6 — 4 July 2026 (IUT Techathon Round-1 prep)
+
+**Phase:** post-ICADHI → competition reuse.
+
+**Shipped:**
+- **Context:** ICADHI demo day done (15 Jun). The Azure prod VM is gone — **nirobd.tech is down**; the demo now runs locally. Redeploy plan (not started): Vercel free tier (frontend + FastAPI function) + Neon Postgres + Vercel Blob; needs `services/storage.py` rewritten from local disk to blob.
+- **New target:** IUT Techathon Nationals & Rover Summit — Project Showcasing (on-campus 10 Jul; Round 1 = ≤500-word abstract PDF + 3–5 min video; team **Cortex Crew**). Event brief + all artifacts in `IUT Project showcasing/`.
+- **Abstract done:** 496 words, repositioned to lead with D-015 auto-categorized records + D-016 স্বাস্থ্য ট্রেন্ড; one-page brand-designed PDF rendered from `abstract-design.html` via headless Chrome, exact required filename. Live-site claims removed (site is down).
+- **Video scripts done:** cinematic 4:40 cut + screen-walkthrough 4:45 matched to the seeded **Rahime** account (11 documents/analyses uploaded via the UI; the HbA1c 9.8→6.1 improvement over 394 days is the money shot). Recording pending (user).
+- Committed the previously-untracked mid-June demo assets: judge pitches (EN/BN + cue cards), BuildFest 180s scripts (root stray moved into `infinity-ai-buildfest/`), Rahima dataset + generator.
+
+**Didn't ship (deferred):** Vercel redeploy; video recording + Drive upload.
+
+**Issues encountered:** none — the local AI key still works (11 fresh analyses today).
+
+**Commit / branch:** docs + asset commits directly on `main` (additive, no code touched).
+
 ## Template for new entries
 
 ```markdown

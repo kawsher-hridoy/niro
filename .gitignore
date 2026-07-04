@@ -65,3 +65,6 @@ real_lab*.png
 .claude/projects/
 .claude/tool-results/
 .claude/*.log
+
+# Large third-party event rulebook (7.5 MB, no work attached yet) — commit deliberately if ever needed
+5th-data-science Summit 26/

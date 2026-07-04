@@ -26,15 +26,21 @@ Generic-agent guidance: `AGENTS.md` (this complements that file).
 | C — Profile + verification       | 23 May          | ✅ **Merged** (PR #3)                |
 | D — Chamber + directory + polish | 23 May          | ✅ **Merged** (PR #4)                |
 | E — Video + submission           | 27 May          | ✅ Recorded + submitted              |
-| **F — Live-demo polish**         | 28 May – 15 Jun | 🔧 **Active** — submission prep on live site |
-| G — Demo day                     | 15 Jun          | Imminent (today)                     |
+| F — Live-demo polish             | 28 May – 15 Jun | ✅ Done                              |
+| G — Demo day (ICADHI)            | 15 Jun          | ✅ Done                              |
+| **H — IUT Techathon Round 1**    | 4 – 10 Jul      | 🔧 **Active** — abstract ✅ done, demo video pending (team **Cortex Crew**) |
 
-**Active work: submission prep + issue-fix loop on the live
-nirobd.tech site.** Phase 1 is feature-complete and deployed; current
-sessions are branch-per-issue fixes and demo polish (see "Issue-fix
-workflow" below). When picking up a new session, read the tail of
-`docs/build-log.md` first — the Day-5 loop runs long and the newest
-entries are the live state.
+**Active work (as of 4 Jul 2026): IUT Techathon Nationals — Project
+Showcasing Round 1** (team **Cortex Crew**, on-campus event 10 Jul).
+The submission package lives in `IUT Project showcasing/`: 496-word
+abstract (md source + designed one-page PDF, exact required filename)
+plus two video scripts; the demo video itself is pending (user records).
+⚠️ **The Azure prod VM is gone — nirobd.tech is DOWN.** Demo runs
+locally (`./niro.sh start`). Planned redeploy: Vercel free tier
+(frontend + FastAPI python function) + Neon Postgres + Vercel Blob —
+requires rewriting `services/storage.py` from local disk to blob.
+When picking up a new session, read the tail of `docs/build-log.md`
+first — the newest entries are the live state.
 
 **What's shipped since the Phase-1 squash-merges (all on `main`):**
 
@@ -53,18 +59,14 @@ entries are the live state.
   with an **`admin` role** and admin-controlled visibility. Live + public
   on nirobd.tech.
 
-**⚠️ In-progress (uncommitted/staged) right now:** a password-reset
-hardening fix — a `reset_token` column on `otp_codes` (migration
-`e8f3a1b4c9d2`, staged), `reset_token` validation in
-`auth.password_reset_confirm`, and the matching `/verify` + `api.ts`
-frontend changes. Don't assume it's merged; confirm git state before
-building on it.
+**Reset-token hardening is shipped** — committed in `a180c8c` (15 Jun):
+migration `e8f3a1b4c9d2`, `auth.password_reset_confirm` validation, and
+the `/verify` + `api.ts` frontend changes are all on `main`.
 
-**Prod-vs-local migration skew (read before migrating):** prod is
-intentionally one revision behind the local file chain — it's at
-`a9b5d9e308af` (docs module), and the `e8f3a1b4c9d2` reset-token head is
-*not* applied on prod yet (see the build-log "Ops note — Live /docs
-database migration"). Local `alembic upgrade head` → `e8f3a1b4c9d2`.
+**Migration state:** local `alembic upgrade head` → `e8f3a1b4c9d2`. The
+old prod DB (which ran one revision behind at `a9b5d9e308af`) died with
+the VM — any future deploy starts from a fresh DB and migrates straight
+to head.
 
 ---
 
@@ -79,7 +81,7 @@ database migration"). Local `alembic upgrade head` → `e8f3a1b4c9d2`.
 | DB          | `postgres:16.3-alpine3.20` (cached locally — see D-007)                                          | pgvector deferred; Phase 1 has no vector queries. Local migration head `e8f3a1b4c9d2`; prod at `a9b5d9e308af` (see Status) |
 | Frontend    | **Next.js 16.2.6** (App Router, Turbopack default), React 19.2, Tailwind 4                       | See "Next.js 16 gotchas" below                                                                                                 |
 | Auth        | Patient signup/password login/reset + legacy OTP, doctor application + OTP for seeded doctors, JWT HS256. Three roles: `patient`, `doctor`, `admin` | Passwords use Argon2id (D-012); OTP storage uses sha256(salt:code) (D-009). Dev doctor applications auto-verify when `APP_ENV != "prod"`. `admin` role gates `/docs` admin endpoints (D-017) via `require_admin` |
-| Hosting     | **LIVE: https://nirobd.tech** — Azure VM, single-domain (Caddy path-routes `/api/*`→:8000, else→:3000), systemd | Deploy updates with `./deploy.sh` on the VM. Single-origin ⇒ **no CORS**; relative API base. See `docs/deployment/`. |
+| Hosting     | **DOWN — Azure VM deleted (Jul 2026)**; nirobd.tech unreachable | Run locally via `./niro.sh start`. Planned: Vercel free tier (frontend + FastAPI function) + Neon Postgres + Vercel Blob — needs a `storage.py` blob rewrite first. Old VM guide kept in `docs/deployment/` for reference. |
 
 ---
 
@@ -365,11 +367,9 @@ docker compose exec -T postgres psql -U niro -d niro \
 ./deploy.sh                            # ff-pull + selective rebuild/migrate/restart + health-check
 ```
 
-**Prod is live at https://nirobd.tech** (Azure VM, single-domain). Code
-updates: SSH to the VM and run `./deploy.sh` (never touches `.env`,
-no-ops when up to date, refuses on a dirty tree). Single-origin path
-routing means **no CORS config in prod** and a relative `NEXT_PUBLIC_API_BASE`.
-Full guide + Caddyfile/systemd templates in `docs/deployment/`.
+**Prod is currently DOWN** — the Azure VM was deleted (Jul 2026).
+`deploy.sh` and `docs/deployment/` describe the old VM setup; keep them
+for reference only. Next deploy target is Vercel free tier (see Status).
 
 ---
 
@@ -417,7 +417,7 @@ The full workflow plan lives at `/home/l0minex/.claude/plans/twinkly-inventing-p
 - **Don't reintroduce dark mode** for Phase 1 — the `prefers-color-scheme: dark` override was removed in Fix #1 (D-011). Light-mode only until explicitly reopened.
 - **Don't commit a fix directly to `main`** — use the issue-fix workflow above (branch per issue → squash-merge after user approval).
 - **Don't put authenticated patient/doctor pages back at top-level routes** — keep patient pages under `(app)` and verified doctor pages under `(doctor)`. Route groups preserve URLs.
-- **Don't blindly `alembic upgrade head` on prod.** Prod is intentionally one revision behind local (at `a9b5d9e308af`); the `e8f3a1b4c9d2` reset-token head ships only with the reset-token feature. On prod, apply migrations deliberately, not "to head" — see Status + the build-log Ops note.
+- **Don't blindly `alembic upgrade head` on a prod DB you didn't create.** (Historical: the old VM's DB deliberately ran one revision behind; that VM is gone. A fresh deploy migrates straight to head.)
 - **Don't flip `/docs` visibility casually.** D-017 visibility is admin-controlled via DB (`docs_config`), not code. Change it through the `PATCH /docs/config` admin endpoint / `/docs/admin` panel — don't hardcode it or edit the row by hand in a migration.
 
 ---
